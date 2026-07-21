@@ -1,0 +1,51 @@
+{% extends "portal/base.html" %}
+{% block title %}Submissions · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+{% include "portal/deadline_banner.html" %}
+<h1>Submissions</h1>
+<p class="page-sub">Start a new CRS return for {{ profile.rfi.legal_name }}. Choose how you would like to prepare it.</p>
+
+{% if is_maker %}
+<div class="card-grid submit-grid">
+  <div class="tile">
+    <h2>Upload CRS XML</h2>
+    <p class="muted">Submit a schema-valid CRS XML file prepared in your own system. The Portal validates it on upload.</p>
+    <a class="btn" href="/portal/filings/upload/">Upload CRS XML</a>
+  </div>
+  <div class="tile">
+    <h2>Manual entry</h2>
+    <p class="muted">Build a return record by record inside the Portal. Suited to a small number of accounts.</p>
+    <a class="btn secondary" href="/portal/filings/new/">Start manual entry</a>
+  </div>
+  <div class="tile">
+    <h2>Nil return</h2>
+    <p class="muted">Declare that {{ profile.rfi.legal_name }} has no reportable accounts for {{ REPORTING_YEAR }}.</p>
+    <form method="post" action="/portal/filings/nil/">
+      {% csrf_token %}
+      <button type="submit" class="btn ghost">File nil return for {{ REPORTING_YEAR }}</button>
+    </form>
+  </div>
+</div>
+{% elif is_checker %}
+<p class="page-sub">As a Checker you review and submit filings prepared by Makers. A Maker starts new returns; you can file a nil return directly below.</p>
+<div class="card-grid submit-grid">
+  <div class="tile">
+    <h2>Nil return</h2>
+    <p class="muted">Declare that {{ profile.rfi.legal_name }} has no reportable accounts for {{ REPORTING_YEAR }}.</p>
+    <form method="post" action="/portal/filings/nil/">
+      {% csrf_token %}
+      <button type="submit" class="btn ghost">File nil return for {{ REPORTING_YEAR }}</button>
+    </form>
+  </div>
+  <div class="tile">
+    <h2>Review draft filings</h2>
+    <p class="muted">Open filings awaiting your review and submit them to the NRS.</p>
+    <a class="btn secondary" href="/portal/filings/drafts/">Go to Draft Filings</a>
+  </div>
+</div>
+{% endif %}
+
+<div class="actions-row" style="margin-top: 24px;">
+  <a class="btn ghost" href="/portal/filings/">View all filings</a>
+</div>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}NRS AEOI-CRS Portal{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'css/portal.css' %}">
+</head>
+<body>
+{% if user.is_authenticated and user.portal_profile %}
+<div class="pt-app">
+  <aside class="pt-side">
+    <div class="pt-side-brand">
+      <a href="/portal/">
+        <span class="mark">RFI</span>
+        <span class="pt-side-brand-text">
+          <span class="org">NRS AEOI-CRS</span>
+          <span class="sys">Reporting Entity Portal</span>
+        </span>
+      </a>
+    </div>
+    <nav class="pt-menu">
+      <a href="/portal/" class="{% if nav == 'home' %}active{% endif %}">Home</a>
+      <span class="pt-menu-group">Workspace</span>
+      <a href="/portal/filings/drafts/" class="{% if nav == 'drafts' %}active{% endif %}">Draft Filings</a>
+      <a href="/portal/submit/" class="{% if nav == 'submit' %}active{% endif %}">Submissions</a>
+      <a href="/portal/filings/" class="{% if nav == 'filings' %}active{% endif %}">Manage Filings</a>
+      <a href="/portal/documents/" class="{% if nav == 'documents' %}active{% endif %}">Documents</a>
+      <span class="pt-menu-group">Account</span>
+      <a href="/portal/profile/" class="{% if nav == 'profile' %}active{% endif %}">Reporting Entity Profile</a>
+      {% if user.portal_profile.role == 'CHECKER' %}
+      <a href="/portal/users/" class="{% if nav == 'users' %}active{% endif %}">Manage Users</a>
+      {% endif %}
+      <a href="/portal/me/" class="{% if nav == 'me' %}active{% endif %}">My Details</a>
+      <span class="pt-menu-group">Support</span>
+      <a href="/portal/help/" class="{% if nav == 'help' %}active{% endif %}">Help</a>
+      <a href="/portal/logout/" class="pt-menu-out">Log Out</a>
+    </nav>
+    <div class="pt-side-foot"><div class="flag-ribbon"></div></div>
+  </aside>
+  <div class="pt-main">
+    <header class="pt-topbar">
+      <div class="pt-topbar-left">
+        <div class="pt-topbar-eyebrow">Reporting Entity Portal</div>
+        <div class="pt-topbar-rfi">{{ user.portal_profile.rfi.legal_name }}</div>
+      </div>
+      <div class="pt-topbar-user">
+        <div class="pt-user-meta">
+          <span class="name">{{ user.portal_profile.display_name }}</span>
+          <span class="role">{{ user.portal_profile.get_role_display }}</span>
+        </div>
+        <span class="pt-avatar" aria-hidden="true">{{ user.portal_profile.display_name|slice:":1"|upper }}</span>
+      </div>
+    </header>
+{% else %}
+<header class="pt-header">
+  <div class="bar">
+    <div class="brand">
+      <a href="/" title="Return to the home page">
+        <div class="org">NRS AEOI-CRS Portal</div>
+        <div class="sys">Reporting Financial Institutions</div>
+      </a>
+    </div>
+    <div class="user-info">
+      <div><a href="/portal/login/">Sign in</a></div>
+      <a href="/" class="home-link">Home</a>
+    </div>
+  </div>
+  <nav class="pt-nav pt-nav-cta">
+    <a href="/portal/enrol/" class="cta enrol {% if nav == 'enrol' %}active{% endif %}">Enrolment</a>
+    <a href="/portal/enrol/status/" class="cta status {% if nav == 'status' %}active{% endif %}">Application Status</a>
+    <a href="/portal/login/" class="cta primary {% if nav == 'login' %}active{% endif %}">Sign In</a>
+  </nav>
+</header>
+{% endif %}
+
+<main class="pt-content">
+  {% if messages %}
+    {% for message in messages %}
+      <div class="flash {{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+{% if user.is_authenticated and user.portal_profile %}
+  </div><!-- /.pt-main -->
+</div><!-- /.pt-app -->
+{% endif %}
+<script>
+/* Skeleton loading: if the next page takes longer than 200ms, swap the
+   content area for a structural outline. */
+(function () {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  var skeleton =
+    '<div class="skeleton-line title"></div>' +
+    '<div class="skeleton-line sub"></div>' +
+    '<div class="skeleton-block"></div>' +
+    '<div class="skeleton-line"></div>' +
+    '<div class="skeleton-line"></div>' +
+    '<div class="skeleton-line sub"></div>';
+  document.addEventListener("click", function (event) {
+    var link = event.target.closest("a");
+    if (!link || link.target || event.metaKey || event.ctrlKey) return;
+    var href = link.getAttribute("href") || "";
+    if (!href.startsWith("/") || href.startsWith("//")) return;
+    setTimeout(function () {
+      var content = document.querySelector(".pt-content");
+      if (content) content.innerHTML = skeleton;
+    }, 200);
+  });
+})();
+
+/* Submit feedback: the pressed button shows a working spinner. */
+document.addEventListener("submit", function (event) {
+  var button = event.submitter;
+  if (button && button.classList && button.classList.contains("btn")) {
+    button.classList.add("is-loading");
+  }
+});
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

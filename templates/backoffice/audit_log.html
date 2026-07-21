@@ -1,0 +1,24 @@
+{% extends "backoffice/base.html" %}
+{% block title %}Audit Log · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Audit Log</h1>
+<p class="page-sub">Append-only record of every state-changing action across both surfaces. Flagged rows indicate possible credential-sharing events.</p>
+<table class="data">
+  <thead><tr><th>Timestamp</th><th>Actor</th><th>Role</th><th>Action</th><th>Target</th><th>State change</th><th>Detail</th></tr></thead>
+  <tbody>
+    {% for entry in entries %}
+    <tr {% if entry.flagged %}style="background: #FDECEC;"{% endif %}>
+      <td class="mono">{{ entry.timestamp|date:"Y-m-d H:i:s" }}</td>
+      <td>{{ entry.actor_name }}</td>
+      <td>{{ entry.actor_role|default:"-" }}</td>
+      <td class="mono">{% if entry.flagged %}<strong style="color:#8A0000;">{{ entry.action }}</strong>{% else %}{{ entry.action }}{% endif %}</td>
+      <td class="mono">{{ entry.target|default:"-" }}</td>
+      <td>{% if entry.before_state or entry.after_state %}{{ entry.before_state|default:"-" }} &gt; {{ entry.after_state|default:"-" }}{% else %}-{% endif %}</td>
+      <td class="muted">{{ entry.detail }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">No audit entries.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NRS AEOI-CRS Platform</title>
+<link rel="stylesheet" href="{% static 'css/portal.css' %}">
+</head>
+<body>
+<div class="landing">
+  <div class="flag-ribbon landing-flag"></div>
+  <header class="landing-hero">
+    <div class="landing-hero-inner">
+      <span class="crest-badge"><span class="mark">NRS</span> Nigeria Revenue Service &middot; Competent Authority</span>
+      <h1>Automatic Exchange of <span class="accent">Information</span></h1>
+      <p class="lead">The national platform for the Common Reporting Standard: enrolment, filing, validation, and exchange of financial account information with partner jurisdictions.</p>
+    </div>
+  </header>
+
+  <main class="landing-main">
+    <div class="entry-grid">
+      <a class="entry-card portal" href="/portal/login/">
+        <span class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V9l7-4 7 4v12"/><path d="M9 21v-6h6v6"/><path d="M9 12h.01M15 12h.01"/></svg>
+        </span>
+        <span class="eyebrow">Reporting Financial Institutions</span>
+        <h2>Reporting Entity &amp; Primary User Enrolment</h2>
+        <p>Enrol your institution, file CRS returns, and work corrections through the RFI Portal.</p>
+        <span class="go">Open the RFI Portal</span>
+      </a>
+      <a class="entry-card office" href="/backoffice/login/">
+        <span class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+        </span>
+        <span class="eyebrow">NRS Supervision Centre</span>
+        <h2>NRS Officers</h2>
+        <p>Front-end filing, outbound exchange, and inbound receipt across the internal Supervision Centre.</p>
+        <span class="go">Open the Supervision Centre</span>
+      </a>
+    </div>
+    <p class="util">Demonstration utilities: <a href="/demo/outbox/">email outbox</a></p>
+  </main>
+</div>
+</body>
+</html>

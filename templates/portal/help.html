@@ -1,0 +1,41 @@
+{% extends "portal/base.html" %}
+{% block title %}Help · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<h1>Help</h1>
+<p class="page-sub">How to prepare and submit CRS returns through the Reporting Entity Portal.</p>
+
+<div class="detail-panels">
+  <section class="panel">
+    <h2>The menu</h2>
+    <dl class="kv">
+      <dt>Home</dt><dd>Your dashboard: deadlines, recent filings, and outstanding actions.</dd>
+      <dt>Draft Filings</dt><dd>Returns still in your hands: drafts, filings pending Checker review, and filings the NRS has returned for correction.</dd>
+      <dt>Submissions</dt><dd>Start a new return by CRS XML upload, manual entry, or a nil return.</dd>
+      <dt>Manage Filings</dt><dd>Every return you have prepared, across all statuses.</dd>
+      <dt>Documents</dt><dd>Enrolment records and CRS XML files you have uploaded.</dd>
+      <dt>Reporting Entity Profile</dt><dd>Your entity's enrolment record and contacts.</dd>
+      <dt>My Details</dt><dd>Your own account details and password.</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>Maker and Checker</h2>
+    <p class="muted">A Maker prepares filings; a Checker reviews and submits them to the NRS. This separation of duties keeps a second pair of eyes on every return before it leaves the institution. The Primary User is the first Checker and can add further users under Manage Users.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Preparing a return</h2>
+    <ol class="help-steps">
+      <li>Open <strong>Submissions</strong> and choose CRS XML upload, manual entry, or a nil return.</li>
+      <li>For an XML upload, the Portal validates the file against the CRS schema on upload.</li>
+      <li>A Maker stages the filing; a Checker then reviews and submits it to the NRS.</li>
+      <li>If the NRS returns a filing for correction, it appears under <strong>Draft Filings</strong> for you to amend and resubmit.</li>
+    </ol>
+  </section>
+
+  <section class="panel">
+    <h2>Need assistance</h2>
+    <p class="muted">For enrolment changes or questions the Portal cannot answer, contact the NRS AEOI-CRS unit. Keep your Reporting Entity reference to hand.</p>
+  </section>
+</div>
+{% endblock %}

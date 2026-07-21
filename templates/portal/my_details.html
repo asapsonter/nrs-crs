@@ -1,0 +1,26 @@
+{% extends "portal/base.html" %}
+{% load pills %}
+{% block title %}My Details · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<h1>My Details</h1>
+<p class="page-sub">Your account within {{ profile.rfi.legal_name }}.</p>
+
+<div class="detail-panels">
+  <section class="panel">
+    <h2>Account</h2>
+    <dl class="kv">
+      <dt>Name</dt><dd>{{ profile.display_name }}</dd>
+      <dt>Position</dt><dd>{{ profile.designation|default:"-" }}</dd>
+      <dt>Sign-in name</dt><dd class="mono">{{ user.username }}</dd>
+      <dt>Duty</dt><dd>{{ profile.get_role_display }}{% if profile.is_primary_user %} (Primary User){% endif %}</dd>
+      <dt>Status</dt><dd>{% pill profile.status profile.get_status_display %}</dd>
+      <dt>Reporting Entity</dt><dd>{{ profile.rfi.legal_name }}</dd>
+      <dt>Account created</dt><dd>{{ profile.created_at|date:"Y-m-d" }}</dd>
+    </dl>
+  </section>
+</div>
+
+<div class="actions-row" style="margin-top: 20px;">
+  <a class="btn secondary" href="/portal/change-password/">Change password</a>
+</div>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "backoffice/base.html" %}
+{% load flags %}
+{% block title %}Reports · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Management reports</h1>
+<p class="page-sub">Reporting year {{ year }}. Read-only analytical views across the AEOI-CRS workflow.</p>
+
+<div class="chart-wrap">
+  <div class="chart-title">Filing funnel by status</div>
+  <svg width="{{ funnel_chart.width }}" height="{{ funnel_chart.height }}" role="img">
+    {% for bar in funnel_chart.bars %}
+    <text x="0" y="{{ bar.y|add:14 }}" font-size="12" fill="#3F3F46" font-family="Segoe UI, Helvetica, Arial, sans-serif">{{ bar.label }}</text>
+    <rect x="220" y="{{ bar.y }}" width="{{ bar.w }}" height="18" fill="#3F3F46"></rect>
+    <text x="{{ bar.w|add:226 }}" y="{{ bar.y|add:14 }}" font-size="12" fill="#C00000" font-weight="600" font-family="Segoe UI, Helvetica, Arial, sans-serif">{{ bar.value }}</text>
+    {% endfor %}
+  </svg>
+</div>
+
+<h2>Records exchanged by jurisdiction</h2>
+<div class="chart-wrap">
+  <div class="chart-title">Outgoing records by partner jurisdiction</div>
+  <svg width="{{ outgoing_chart.width }}" height="{{ outgoing_chart.height }}" role="img">
+    {% for bar in outgoing_chart.bars %}
+    <text x="0" y="{{ bar.y|add:14 }}" font-size="12" fill="#3F3F46" font-family="Segoe UI, Helvetica, Arial, sans-serif">{{ bar.label }}</text>
+    <rect x="220" y="{{ bar.y }}" width="{{ bar.w }}" height="18" fill="#C00000"></rect>
+    <text x="{{ bar.w|add:226 }}" y="{{ bar.y|add:14 }}" font-size="12" fill="#2B2B2B" font-weight="600" font-family="Segoe UI, Helvetica, Arial, sans-serif">{{ bar.value }}</text>
+    {% empty %}
+    <text x="0" y="20" font-size="12" fill="#6B7280">No records packaged yet.</text>
+    {% endfor %}
+  </svg>
+</div>
+
+<table class="data" style="max-width: 560px;">
+  <thead><tr><th>Direction</th><th>Jurisdiction</th><th>Records</th></tr></thead>
+  <tbody>
+    {% for code, total in outgoing %}
+    <tr><td>Outgoing</td><td class="mono">{{ code|flag }}{{ code }}</td><td class="num">{{ total }}</td></tr>
+    {% endfor %}
+    {% for code, total in incoming %}
+    <tr><td>Incoming (disseminated)</td><td class="mono">{{ code|flag }}{{ code }}</td><td class="num">{{ total }}</td></tr>
+    {% endfor %}
+    {% if not outgoing and not incoming %}
+    <tr><td colspan="3" class="muted">No exchange activity yet.</td></tr>
+    {% endif %}
+  </tbody>
+</table>
+
+<h2>Correction rate per RFI</h2>
+<table class="data" style="max-width: 720px;">
+  <thead><tr><th>Institution</th><th>Records reported</th><th>Corrected (OECD2)</th><th>Correction rate</th></tr></thead>
+  <tbody>
+    {% for row in correction_rates %}
+    <tr>
+      <td>{{ row.rfi.legal_name }}</td>
+      <td class="num">{{ row.total }}</td>
+      <td class="num">{{ row.corrected }}</td>
+      <td class="num" {% if row.rate > 10 %}style="color:#8A0000; font-weight:600;"{% endif %}>{{ row.rate }}%</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4" class="muted">No records reported yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Enrolment throughput</h2>
+<table class="data" style="max-width: 480px;">
+  <thead><tr><th>Status</th><th>Applications</th></tr></thead>
+  <tbody>
+    {% for label, total in enrolment_rows %}
+    <tr><td>{{ label }}</td><td class="num">{{ total }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Exchange timeliness</h2>
+<dl class="kv">
+  <dt>Exchange deadline</dt><dd>{{ timeliness.deadline|date:"j F Y" }} ({{ timeliness.days_remaining }} days remaining)</dd>
+  <dt>Packages transmitted</dt><dd>{{ timeliness.transmitted }}</dd>
+  <dt>Packages not yet transmitted</dt><dd>{{ timeliness.outstanding }}</dd>
+  <dt>Cycles closed and archived</dt><dd>{{ timeliness.archived }}</dd>
+</dl>
+{% endblock %}

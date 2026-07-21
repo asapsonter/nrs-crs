@@ -1,0 +1,140 @@
+{% extends "backoffice/base.html" %}
+{% load pills %}
+{% block title %}{{ rfi.reference }} · Registration{% endblock %}
+{% block content %}
+<h1>{{ rfi.legal_name }}</h1>
+<p class="page-sub">{{ rfi.reference }} &middot; {% pill rfi.status rfi.get_status_display %}</p>
+
+<div class="panel">
+  <h2 style="margin-top: 0;">Application</h2>
+  <dl class="kv">
+    <dt>TIN</dt><dd class="mono">{{ rfi.tin }}</dd>
+    <dt>Financial Institution Category</dt><dd>{{ rfi.get_category_display }}</dd>
+    <dt>Enrolment type</dt><dd>{{ rfi.get_enrolment_type_display }}</dd>
+    <dt>Registered address</dt><dd>{{ rfi.full_address|default:"Not provided" }}</dd>
+    <dt>Institution email</dt><dd>{{ rfi.email|default:"Not provided" }}</dd>
+    <dt>Institution telephone</dt><dd>{{ rfi.full_phone|default:"Not provided" }}</dd>
+    <dt>Primary User</dt><dd>{{ rfi.pu_surname }}, {{ rfi.pu_first_name }} &middot; {{ rfi.pu_designation }}</dd>
+    <dt>PU email</dt><dd>{{ rfi.pu_email }}</dd>
+    <dt>PU telephone</dt><dd>{{ rfi.pu_full_phone }}</dd>
+    <dt>PU identification</dt><dd>{% if rfi.id_document %}<a href="{{ rfi.id_document.url }}">{{ rfi.id_document.name }}</a>{% else %}Not on file{% endif %}</dd>
+    <dt>CEO letter</dt><dd>{% if rfi.ceo_letter %}<a href="{{ rfi.ceo_letter.url }}">{{ rfi.ceo_letter.name }}</a>{% else %}Not on file{% endif %}</dd>
+    <dt>Submitted</dt><dd>{{ rfi.submitted_at|date:"Y-m-d H:i" }}</dd>
+  </dl>
+</div>
+
+{% if rfi.reviewed_at %}
+<div class="panel band">
+  <h2 style="margin-top: 0;">Officer assessment</h2>
+  <dl class="kv">
+    <dt>Reviewed by</dt><dd>{{ rfi.reviewer.name|default:"NRS Registration Unit" }} on {{ rfi.reviewed_at|date:"Y-m-d H:i" }}</dd>
+    <dt>TIN verified</dt><dd>{{ rfi.check_tin|yesno:"Yes,No" }}</dd>
+    <dt>CEO letter sighted</dt><dd>{{ rfi.check_ceo_letter|yesno:"Yes,No" }}</dd>
+    <dt>Licence confirmed</dt><dd>{{ rfi.check_licence|yesno:"Yes,No" }}</dd>
+    <dt>Classification confirmed</dt><dd>{{ rfi.check_classification|yesno:"Yes,No" }}</dd>
+    <dt>Notes</dt><dd>{{ rfi.review_notes|default:"-" }}</dd>
+    <dt>Recommendation</dt><dd><strong>{{ rfi.get_recommendation_display|default:"-" }}</strong></dd>
+  </dl>
+</div>
+{% endif %}
+
+{% if rfi.status == 'REJECTED' %}
+<div class="panel">
+  <h2 style="margin-top: 0;">Decision</h2>
+  <dl class="kv">
+    <dt>Decided by</dt><dd>{{ rfi.decided_by.name|default:"NRS Registration Unit" }} on {{ rfi.decided_at|date:"Y-m-d H:i" }}</dd>
+    <dt>Rejection reason</dt><dd>{{ rfi.rejection_reason }}</dd>
+  </dl>
+</div>
+{% endif %}
+
+{% if can_review %}
+<div class="panel">
+  <h2 style="margin-top: 0;">Record assessment</h2>
+  <form method="post" action="/backoffice/registration/{{ rfi.pk }}/review/" class="stacked">
+    {% csrf_token %}
+    <div class="checkbox-row"><input type="checkbox" name="check_tin" id="check_tin" {% if rfi.check_tin %}checked{% endif %}><label for="check_tin" style="margin: 0;">TIN verified against the taxpayer register</label></div>
+    <div class="checkbox-row"><input type="checkbox" name="check_ceo_letter" id="check_ceo_letter" {% if rfi.check_ceo_letter %}checked{% endif %}><label for="check_ceo_letter" style="margin: 0;">CEO letter introducing the PU sighted</label></div>
+    <div class="checkbox-row"><input type="checkbox" name="check_licence" id="check_licence" {% if rfi.check_licence %}checked{% endif %}><label for="check_licence" style="margin: 0;">Regulatory licence confirmed</label></div>
+    <div class="checkbox-row"><input type="checkbox" name="check_classification" id="check_classification" {% if rfi.check_classification %}checked{% endif %}><label for="check_classification" style="margin: 0;">CRS classification confirmed</label></div>
+    <label for="review_notes">Assessment notes</label>
+    <textarea name="review_notes" id="review_notes" rows="4">{{ rfi.review_notes }}</textarea>
+    <label for="recommendation">Recommendation</label>
+    <select name="recommendation" id="recommendation" required>
+      <option value="">Select</option>
+      <option value="APPROVE">Approval</option>
+      <option value="REJECT">Rejection</option>
+    </select>
+    <div class="actions-row">
+      <button type="submit" class="btn">Record assessment</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{% if awaiting_decision and not can_decide %}
+<div class="panel band decision-gate">
+  <h2 style="margin-top: 0;">Awaiting a decision</h2>
+  <p>This application is awaiting acceptance or rejection. Your current role is read-only for enrolments; an <strong>Assistant Admin</strong> or <strong>Internal Admin user</strong> can accept or reject it.</p>
+</div>
+{% endif %}
+
+{% if can_decide %}
+<div class="panel">
+  <h2 style="margin-top: 0;">Decision</h2>
+  <form method="post" action="/backoffice/registration/{{ rfi.pk }}/decide/" class="stacked" id="decide-form">
+    {% csrf_token %}
+    <div class="actions-row" id="decide-actions">
+      <button type="submit" name="decision" value="approve" class="btn">Approve</button>
+      <button type="button" class="btn ghost" id="reject-toggle">Reject</button>
+    </div>
+    <div id="reject-panel" hidden>
+      <label for="rejection_reason">Rejection reason (sent to the applicant)</label>
+      <textarea name="rejection_reason" id="rejection_reason" rows="3"></textarea>
+      <div class="actions-row">
+        <button type="submit" name="decision" value="reject" class="btn ghost">Confirm rejection</button>
+        <button type="button" class="btn secondary" id="reject-cancel">Cancel</button>
+      </div>
+    </div>
+  </form>
+</div>
+<script>
+(function () {
+  var actions = document.getElementById("decide-actions");
+  var toggle = document.getElementById("reject-toggle");
+  var panel = document.getElementById("reject-panel");
+  var cancel = document.getElementById("reject-cancel");
+  if (!toggle || !panel) return;
+  toggle.addEventListener("click", function () {
+    panel.hidden = false;
+    actions.hidden = true;
+    var field = document.getElementById("rejection_reason");
+    if (field) field.focus();
+  });
+  if (cancel) cancel.addEventListener("click", function () {
+    panel.hidden = true;
+    actions.hidden = false;
+  });
+})();
+</script>
+{% endif %}
+
+{% if can_manage_standing %}
+<div class="panel band">
+  <h2 style="margin-top: 0;">Institution standing</h2>
+  <form method="post" action="/backoffice/registration/{{ rfi.pk }}/standing/">
+    {% csrf_token %}
+    <div class="actions-row">
+      {% if rfi.status == 'SUSPENDED' %}
+      <button type="submit" name="action" value="reinstate" class="btn secondary">Reinstate</button>
+      {% else %}
+      <button type="submit" name="action" value="suspend" class="btn secondary">Suspend</button>
+      {% endif %}
+      <button type="submit" name="action" value="deactivate" class="btn ghost">Deactivate</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<div class="back-nav"><a class="btn-back" href="/backoffice/registration/">Back to registration queue</a></div>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "portal/base.html" %}
+{% load pills %}
+{% block title %}Manage Filings · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+{% include "portal/deadline_banner.html" %}
+<h1>Manage Filings</h1>
+<p class="page-sub">All CRS returns for {{ profile.rfi.legal_name }}, across every status. To start a new return, use Submissions.</p>
+
+<div class="list-toolbar">
+  <span class="list-count">{{ filings|length }} filing{{ filings|length|pluralize }} <span class="dim">all statuses</span></span>
+  <div class="actions-row">
+    <a class="btn" href="/portal/submit/">Start a new submission</a>
+    <a class="btn secondary" href="/portal/filings/drafts/">View draft filings</a>
+  </div>
+</div>
+
+<table class="data">
+  <thead><tr><th>Reference</th><th>Year</th><th>Type</th><th>Records</th><th>Status</th><th>Prepared by</th><th>Created</th><th></th></tr></thead>
+  <tbody>
+    {% for filing in filings %}
+    <tr>
+      <td class="mono">{{ filing.reference }}</td>
+      <td>{{ filing.reporting_year }}</td>
+      <td>{{ filing.get_kind_display }} ({{ filing.message_type }})</td>
+      <td class="num">{{ filing.record_count }}</td>
+      <td>{% pill filing.status filing.get_status_display %}</td>
+      <td>{{ filing.created_by.display_name|default:"-" }}</td>
+      <td>{{ filing.created_at|date:"Y-m-d" }}</td>
+      <td><a href="/portal/filings/{{ filing.pk }}/">Open</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="8" class="muted">No filings yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

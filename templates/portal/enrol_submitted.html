@@ -1,0 +1,15 @@
+{% extends "portal/base.html" %}
+{% block title %}Application Submitted · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<div class="public-wrap">
+  <h1>Application submitted</h1>
+  <div class="panel">
+    <dl class="kv">
+      <dt>Reference number</dt><dd class="mono"><strong>{{ rfi.reference }}</strong></dd>
+      <dt>Institution</dt><dd>{{ rfi.legal_name }}</dd>
+      <dt>Status</dt><dd>Submitted, awaiting review</dd>
+    </dl>
+  </div>
+  <p class="lead">Retain the reference number. The application status can be checked at any time on the <a href="/portal/enrol/status/">application status page</a>. The Primary User will receive sign in credentials by email if the application is approved.</p>
+</div>
+{% endblock %}

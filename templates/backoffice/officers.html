@@ -1,0 +1,44 @@
+{% extends "backoffice/base.html" %}
+{% block title %}Users · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Users</h1>
+<p class="page-sub">Internal user register. A user may hold several roles; access is the union of those roles. Users hold no standing passwords; access is by credential issued from the admin console.</p>
+
+<table class="data">
+  <thead><tr><th>Name</th><th>Roles</th><th>Email</th><th>Credentials</th><th></th></tr></thead>
+  <tbody>
+    {% for officer in officers %}
+    <tr>
+      <td>{{ officer.name }}</td>
+      <td>
+        {% for label in officer.role_labels %}<span class="pill neutral">{{ label }}</span> {% empty %}<span class="muted">No roles</span>{% endfor %}
+      </td>
+      <td>{{ officer.email }}</td>
+      <td class="num">{{ officer.credentials.count }}</td>
+      <td><a href="/backoffice/admin-console/officers/{{ officer.pk }}/">Manage</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="muted">No users yet. Create the first one below.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="panel band mt">
+  <h2 style="margin-top: 0;">Create user</h2>
+  <form method="post" class="stacked">
+    {% csrf_token %}
+    <label for="name">Full name</label>
+    <input type="text" name="name" id="name" required>
+    <label for="email">Email</label>
+    <input type="email" name="email" id="email" required>
+    <label>Roles (select one or more)</label>
+    {% for value, label in role_choices %}
+    <div class="checkbox-row">
+      <input type="checkbox" name="roles" value="{{ value }}" id="role_{{ value }}">
+      <label for="role_{{ value }}" style="margin: 0;">{{ label }}</label>
+    </div>
+    {% endfor %}
+    <div class="actions-row"><button type="submit" class="btn">Create user</button></div>
+  </form>
+</div>
+{% endblock %}

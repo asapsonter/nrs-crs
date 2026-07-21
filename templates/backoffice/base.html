@@ -1,0 +1,167 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}NRS Supervision Centre{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'css/backoffice.css' %}">
+</head>
+<body>
+<div class="bo-layout">
+  <aside class="bo-sidebar">
+    <div class="brand">
+      <a href="/" title="Return to the home page">
+        <span class="mono-badge">NRS</span>
+        <span class="brand-text">
+          <span class="org">Nigeria Revenue Service</span>
+          <span class="sys">AEOI-CRS Supervision Centre</span>
+        </span>
+      </a>
+    </div>
+    <nav>
+      {% if user.is_superuser %}
+        <div class="nav-section">Administration</div>
+        <a href="/backoffice/admin-console/" class="{% if nav == 'admin' %}active{% endif %}">Admin Console</a>
+        <a href="/backoffice/admin-console/officers/" class="{% if nav == 'officers' %}active{% endif %}">Users</a>
+        <a href="/backoffice/admin-console/sessions/" class="{% if nav == 'sessions' %}active{% endif %}">Live Sessions</a>
+        <a href="/backoffice/audit/" class="{% if nav == 'audit' %}active{% endif %}">Audit Log</a>
+        <a href="/backoffice/audit/credentials/" class="{% if nav == 'audit-credentials' %}active{% endif %}">Credential History</a>
+      {% elif credential %}
+        <div class="nav-section">Overview</div>
+        <a href="/backoffice/" class="{% if nav == 'dashboard' %}active{% endif %}">Dashboard</a>
+        {% if 'view_registration' in bo_caps or 'view_returns' in bo_caps %}
+          <div class="nav-section">Process 1 · Front-End Filing</div>
+          {% if 'view_registration' in bo_caps %}
+          <a href="/backoffice/registration/" class="{% if nav == 'registration' %}active{% endif %}">Enrolment &amp; Approval</a>
+          {% endif %}
+          {% if 'view_returns' in bo_caps %}
+          <a href="/backoffice/returns/" class="{% if nav == 'returns' %}active{% endif %}">Returns Validation</a>
+          {% endif %}
+        {% endif %}
+        {% if 'view_exchange' in bo_caps %}
+          <div class="nav-section">Process 2 · Outbound Exchange</div>
+          <a href="/backoffice/exchange/" class="{% if nav == 'exchange' %}active{% endif %}">Exchange Packages</a>
+          <a href="/backoffice/exchange/corrections/" class="{% if nav == 'corrections' %}active{% endif %}">Correction Queue</a>
+        {% endif %}
+        {% if 'view_exchange' in bo_caps or 'view_tax_authority' in bo_caps %}
+          <div class="nav-section">Process 3 · Inbound Receipt</div>
+          {% if 'view_exchange' in bo_caps %}
+          <a href="/backoffice/exchange/inbound/" class="{% if nav == 'inbound' %}active{% endif %}">Inbound Files</a>
+          {% endif %}
+          {% if 'view_tax_authority' in bo_caps %}
+          <a href="/backoffice/exchange/tax-authority-view/" class="{% if nav == 'tav' %}active{% endif %}">Tax Authority View</a>
+          {% endif %}
+        {% endif %}
+        {% if 'view_reports' in bo_caps or 'view_audit' in bo_caps %}
+          <div class="nav-section">Oversight</div>
+          {% if 'view_reports' in bo_caps %}
+          <a href="/backoffice/reports/" class="{% if nav == 'reports' %}active{% endif %}">Reports</a>
+          {% endif %}
+          {% if 'view_audit' in bo_caps %}
+          <a href="/backoffice/audit/" class="{% if nav == 'audit' %}active{% endif %}">Audit Log</a>
+          {% endif %}
+        {% endif %}
+      {% endif %}
+    </nav>
+    <div class="side-foot">
+      <a href="/" class="side-home">Return to home page</a>
+      <div class="side-note">Demonstration environment.<br>Seismic Consulting for NRS.</div>
+    </div>
+  </aside>
+  <div class="bo-main">
+    <header class="bo-header">
+      <div class="title">
+        <span class="title-badge">NRS</span>
+        <span class="title-text">
+          <span class="title-main">AEOI-CRS Supervision Centre</span>
+          <span class="title-kicker">Automatic Exchange of Information</span>
+        </span>
+      </div>
+      <div class="session">
+        {% if user.is_authenticated %}
+          {% if credential %}
+            <span class="user-badge">
+              <span class="user-name">{{ credential.officer.name }}</span>
+              <span class="user-roles">
+                {% for label in credential.role_labels %}<span class="role-chip">{{ label }}</span>{% endfor %}
+              </span>
+            </span>
+            <span class="countdown" id="session-countdown" data-remaining="{{ credential_remaining_seconds }}">--:--</span>
+          {% elif user.is_superuser %}
+            <span class="user-badge"><span class="user-name">Super Admin</span></span>
+          {% endif %}
+          <a class="logout-link" href="/backoffice/logout/">End session</a>
+        {% endif %}
+      </div>
+    </header>
+    <main class="bo-content">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="flash {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<script>
+(function () {
+  var el = document.getElementById("session-countdown");
+  if (!el) return;
+  var remaining = parseInt(el.dataset.remaining, 10);
+  if (isNaN(remaining)) return;
+  function render() {
+    if (remaining <= 0) {
+      el.textContent = "00:00";
+      el.classList.add("low");
+      window.location.reload();
+      return;
+    }
+    var h = Math.floor(remaining / 3600);
+    var m = Math.floor((remaining % 3600) / 60);
+    var s = remaining % 60;
+    el.textContent = (h > 0 ? String(h).padStart(2, "0") + ":" : "") +
+      String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+    if (remaining < 300) el.classList.add("low");
+    remaining -= 1;
+    setTimeout(render, 1000);
+  }
+  render();
+})();
+
+/* Skeleton loading: if the next page takes longer than 200ms, swap the
+   content area for a structural outline. Fast navigations skip straight to
+   the page transition, so the skeleton never flashes. */
+(function () {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  var skeleton =
+    '<div class="skeleton-line title"></div>' +
+    '<div class="skeleton-line sub"></div>' +
+    '<div class="skeleton-block"></div>' +
+    '<div class="skeleton-line"></div>' +
+    '<div class="skeleton-line"></div>' +
+    '<div class="skeleton-line sub"></div>';
+  document.addEventListener("click", function (event) {
+    var link = event.target.closest("a");
+    if (!link || link.target || event.metaKey || event.ctrlKey) return;
+    var href = link.getAttribute("href") || "";
+    if (!href.startsWith("/") || href.startsWith("//")) return;
+    setTimeout(function () {
+      var content = document.querySelector(".bo-content");
+      if (content) content.innerHTML = skeleton;
+    }, 200);
+  });
+})();
+
+/* Submit feedback: the pressed button shows a working spinner. The class is
+   visual only, so named submit values still reach the server. */
+document.addEventListener("submit", function (event) {
+  var button = event.submitter;
+  if (button && button.classList && button.classList.contains("btn")) {
+    button.classList.add("is-loading");
+  }
+});
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

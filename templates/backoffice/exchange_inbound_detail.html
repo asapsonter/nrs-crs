@@ -1,0 +1,144 @@
+{% extends "backoffice/base.html" %}
+{% load pills flags %}
+{% block title %}{{ inbound.message_ref_id }} · Inbound{% endblock %}
+{% block content %}
+<h1 class="mono">{{ inbound.message_ref_id }}</h1>
+<p class="page-sub">
+  From {{ inbound.jurisdiction.code|flag }}{{ inbound.jurisdiction.name }} ({{ inbound.jurisdiction.code }}) &middot; Reporting year {{ inbound.reporting_year }} &middot;
+  {% pill inbound.status inbound.get_status_display %}
+</p>
+
+<div class="panel">
+  <h2 style="margin-top: 0;">Processing</h2>
+  <ul class="pipeline">
+    <li class="{% if inbound.file_checked_at %}{% if inbound.status == 'FILE_ERROR' %}current{% else %}done{% endif %}{% elif inbound.status == 'RECEIVED' %}current{% endif %}">
+      <span class="dot"></span>Stage one: decrypt and schema check
+    </li>
+    <li class="{% if inbound.records_checked_at and inbound.status != 'RECORD_ERRORS' %}done{% elif inbound.status == 'RECORD_ERRORS' %}current{% endif %}">
+      <span class="dot"></span>Stage two: record-level checks
+    </li>
+    <li class="{% if inbound.status == 'ACCEPTED' or inbound.status == 'APPROVED' or inbound.status == 'MATCHED' or inbound.status == 'DISSEMINATED' %}done{% endif %}">
+      <span class="dot"></span>Accepted Status Message issued
+    </li>
+    <li class="{% if inbound.status == 'APPROVED' or inbound.status == 'MATCHED' or inbound.status == 'DISSEMINATED' %}done{% elif inbound.status == 'ACCEPTED' %}current{% endif %}">
+      <span class="dot"></span>Approved for domestic use
+    </li>
+    <li class="{% if inbound.status == 'MATCHED' or inbound.status == 'DISSEMINATED' %}done{% elif inbound.status == 'APPROVED' %}current{% endif %}">
+      <span class="dot"></span>Matched to Nigerian taxpayers and risk-profiled
+    </li>
+    <li class="{% if inbound.status == 'DISSEMINATED' %}done{% elif inbound.status == 'MATCHED' and unmatched_count == 0 %}current{% endif %}">
+      <span class="dot"></span>Disseminated to the Tax Authority View
+    </li>
+  </ul>
+  {% if inbound.matched_at %}
+  <p class="match-summary">
+    <span class="pill accepted">{{ matched_count }} matched</span>
+    {% if unmatched_count %}<span class="pill rejected">{{ unmatched_count }} unmatched</span>{% endif %}
+    to the Nigerian taxpayer register.
+  </p>
+  {% endif %}
+  {% if 'operate_exchange' in bo_caps %}
+  <div class="actions-row">
+    {% if inbound.status == 'RECEIVED' and not inbound.file_checked_at %}
+    <form method="post" action="/backoffice/exchange/inbound/{{ inbound.pk }}/file-check/">
+      {% csrf_token %}<button type="submit" class="btn">Run file-level checks</button>
+    </form>
+    {% endif %}
+    {% if inbound.file_checked_at and inbound.status == 'RECEIVED' or inbound.status == 'RECORD_ERRORS' and not error_records %}
+    <form method="post" action="/backoffice/exchange/inbound/{{ inbound.pk }}/record-check/">
+      {% csrf_token %}<button type="submit" class="btn">Run record-level checks</button>
+    </form>
+    {% endif %}
+    {% if inbound.status == 'ACCEPTED' %}
+    <form method="post" action="/backoffice/exchange/inbound/{{ inbound.pk }}/approve/">
+      {% csrf_token %}<button type="submit" class="btn">Approve for domestic use</button>
+    </form>
+    {% endif %}
+    {% if inbound.status == 'APPROVED' or inbound.status == 'MATCHED' and unmatched_count %}
+    <form method="post" action="/backoffice/exchange/inbound/{{ inbound.pk }}/match/">
+      {% csrf_token %}<button type="submit" class="btn">{% if inbound.status == 'MATCHED' %}Reattempt taxpayer matching{% else %}Match to Nigerian taxpayers{% endif %}</button>
+    </form>
+    {% endif %}
+    {% if inbound.status == 'MATCHED' and unmatched_count == 0 %}
+    <form method="post" action="/backoffice/exchange/inbound/{{ inbound.pk }}/disseminate/">
+      {% csrf_token %}<button type="submit" class="btn">Disseminate matched records</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if inbound.status == 'FILE_ERROR' %}
+  <p class="error-text mt">The whole file was rejected at stage one and a file-error Status Message was issued to {{ inbound.jurisdiction.name }}. Processing ends here; the partner must retransmit.</p>
+  {% endif %}
+</div>
+
+{% if error_records and inbound.status == 'RECORD_ERRORS' and 'operate_exchange' in bo_caps %}
+<div class="panel band">
+  <h2 style="margin-top: 0;">Demo control: act as {{ inbound.jurisdiction.code|flag }}{{ inbound.jurisdiction.name }}</h2>
+  <p class="muted">{{ error_records|length }} record(s) are outstanding with the partner. This control returns them corrected.</p>
+  <form method="post" action="/backoffice/exchange/inbound/{{ inbound.pk }}/partner-correction/">
+    {% csrf_token %}
+    <button type="submit" class="btn dark">Send corrected records as partner</button>
+  </form>
+</div>
+{% endif %}
+
+{% if inbound.status == 'MATCHED' and unmatched_count and 'operate_exchange' in bo_caps %}
+<div class="panel band">
+  <h2 style="margin-top: 0;">Reattempt loop: resolve unmatched identities</h2>
+  <p class="muted">{{ unmatched_count }} record(s) could not be matched to the taxpayer register. This control resolves their identity from supporting data and registers them, so matching can be reattempted (BPMN IB-09).</p>
+  <form method="post" action="/backoffice/exchange/inbound/{{ inbound.pk }}/resolve-identities/">
+    {% csrf_token %}
+    <button type="submit" class="btn dark">Resolve identities and register</button>
+  </form>
+</div>
+{% endif %}
+
+{% if status_messages %}
+<h2>Status Messages issued</h2>
+<table class="data">
+  <thead><tr><th>Issued</th><th>Outcome</th><th>Code</th><th>Detail</th></tr></thead>
+  <tbody>
+    {% for message in status_messages %}
+    <tr>
+      <td>{{ message.created_at|date:"Y-m-d H:i" }}</td>
+      <td>{% pill message.outcome message.get_outcome_display %}</td>
+      <td class="mono">{{ message.error_code|default:"-" }}</td>
+      <td>{{ message.detail }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Records</h2>
+<table class="data">
+  <thead><tr><th>DocRefID</th><th>Holder (NG resident)</th><th>NG TIN</th><th>Account</th><th>Balance</th><th>Record state</th><th>Taxpayer match</th><th>Review track</th></tr></thead>
+  <tbody>
+    {% for record in records %}
+    <tr>
+      <td class="mono">{{ record.doc_ref_id }}</td>
+      <td>{{ record.holder_name }}</td>
+      <td class="mono">{{ record.ng_tin|default:"-" }}</td>
+      <td class="mono">{{ record.account_number }}</td>
+      <td class="num">{{ record.balance }} {{ record.currency }}</td>
+      <td>
+        {% if record.has_error and not record.corrected %}<span class="pill rejected">{{ record.error_code }} {{ record.error_detail }}</span>
+        {% elif record.corrected %}<span class="pill correction">Corrected by partner</span>
+        {% else %}<span class="pill neutral">Clean</span>{% endif %}
+      </td>
+      <td>
+        {% if record.match_status == 'MATCHED' %}<span class="pill accepted">Matched · {{ record.match_basis|lower }}</span>
+        {% elif inbound.matched_at %}<span class="pill rejected">Unmatched</span>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+      <td>
+        {% if record.risk_rating %}<span class="risk risk-{{ record.risk_rating|lower }}">{{ record.get_risk_rating_display }}</span>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="back-nav"><a class="btn-back" href="/backoffice/exchange/inbound/">Back to inbound files</a></div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "backoffice/base.html" %}
+{% block title %}Admin Console · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Admin Console</h1>
+<p class="page-sub">Create internal users, assign them roles, and issue single-use, time-boxed credentials. Administrators administer; they do not process casework.</p>
+
+{% if issued %}
+<div class="panel" style="border-color: #C00000;">
+  <h2 style="margin-top: 0;">Credential issued. Shown once only.</h2>
+  <dl class="kv">
+    <dt>User</dt><dd>{{ issued.0.officer.name }}</dd>
+    <dt>Roles</dt><dd>{{ issued.0.role_display }}</dd>
+    <dt>Username</dt><dd class="mono">{{ issued.0.username }}</dd>
+    <dt>Passcode</dt><dd class="mono"><strong>{{ issued.1 }}</strong></dd>
+    <dt>Session window</dt><dd>{{ issued.0.session_hours }} hours from first use</dd>
+    <dt>Valid for first use until</dt><dd>{{ issued.0.expires_if_unused_at|date:"Y-m-d H:i" }}</dd>
+  </dl>
+  <p class="muted">The passcode is stored hashed and cannot be retrieved again. If lost, revoke and issue a new credential.</p>
+</div>
+{% endif %}
+
+<div class="panel band">
+  <h2 style="margin-top: 0;">Issue a credential</h2>
+  <p class="muted">The credential carries the roles assigned to the selected user. Create users and set their roles under Users.</p>
+  <form method="post" class="stacked">
+    {% csrf_token %}
+    <label for="officer">User</label>
+    <select name="officer" id="officer" required>
+      {% for officer in officers %}
+      <option value="{{ officer.pk }}">{{ officer.name }} &mdash; {{ officer.role_display }}</option>
+      {% empty %}
+      <option value="" disabled>No users yet. Create one under Users.</option>
+      {% endfor %}
+    </select>
+    <label for="session_hours">Session duration (hours)</label>
+    <input type="number" name="session_hours" id="session_hours" step="0.05" min="0.05" max="24" value="5.0" required>
+    <div class="actions-row">
+      <button type="submit" class="btn">Issue credential</button>
+      <a class="btn secondary" href="/backoffice/admin-console/officers/">Manage users</a>
+    </div>
+  </form>
+</div>
+
+<h2>Recent credentials</h2>
+<table class="data">
+  <thead>
+    <tr><th>Username</th><th>User</th><th>Roles</th><th>Issued</th><th>Window</th><th>Status</th><th>Session ends</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for credential in recent %}
+    <tr>
+      <td class="mono">{{ credential.username }}</td>
+      <td>{{ credential.officer.name }}</td>
+      <td>{{ credential.role_display }}</td>
+      <td>{{ credential.issued_at|date:"Y-m-d H:i" }}</td>
+      <td>{{ credential.session_hours }} h</td>
+      <td>
+        {% if credential.status == 'ISSUED' %}<span class="pill review">Issued</span>
+        {% elif credential.status == 'ACTIVE' %}<span class="pill active-state">Active</span>
+        {% elif credential.status == 'CONSUMED' %}<span class="pill neutral">Consumed</span>
+        {% elif credential.status == 'REVOKED' %}<span class="pill rejected">Revoked</span>
+        {% else %}<span class="pill draft">Expired</span>{% endif %}
+      </td>
+      <td>{{ credential.session_expires_at|date:"Y-m-d H:i"|default:"-" }}</td>
+      <td>
+        {% if credential.status == 'ISSUED' or credential.status == 'ACTIVE' %}
+        <form method="post" action="/backoffice/admin-console/credentials/{{ credential.pk }}/revoke/" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="/backoffice/admin-console/">
+          <button type="submit" class="btn ghost small">Revoke</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="8" class="muted">No credentials issued yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

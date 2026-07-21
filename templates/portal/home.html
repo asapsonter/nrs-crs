@@ -1,0 +1,31 @@
+{% extends "portal/base.html" %}
+{% load pills %}
+{% block title %}Overview · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+{% include "portal/deadline_banner.html" %}
+<h1>{{ rfi.legal_name }}</h1>
+<p class="page-sub">Enrolment reference {{ rfi.reference }} &middot; {{ rfi.get_enrolment_type_display }} &middot; {{ rfi.get_category_display }} &middot; {% pill rfi.status rfi.get_status_display %}</p>
+
+<h2>Recent filings</h2>
+<table class="data">
+  <thead><tr><th>Reference</th><th>Year</th><th>Type</th><th>Records</th><th>Status</th><th>Created</th><th></th></tr></thead>
+  <tbody>
+    {% for filing in filings %}
+    <tr>
+      <td class="mono">{{ filing.reference }}</td>
+      <td>{{ filing.reporting_year }}</td>
+      <td>{{ filing.get_kind_display }} ({{ filing.message_type }})</td>
+      <td class="num">{{ filing.record_count }}</td>
+      <td>{% pill filing.status filing.get_status_display %}</td>
+      <td>{{ filing.created_at|date:"Y-m-d" }}</td>
+      <td><a href="/portal/filings/{{ filing.pk }}/">Open</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">No filings yet for this institution.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="actions-row">
+  <a class="btn" href="/portal/filings/">Go to filings</a>
+</div>
+{% endblock %}

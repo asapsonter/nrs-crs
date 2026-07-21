@@ -1,0 +1,9 @@
+{% if deadline_overdue %}
+<div class="deadline-banner overdue">
+  The CRS filing deadline of {{ deadline_date|date:"j F Y" }} for reporting year {{ REPORTING_YEAR }} has passed. Outstanding filings attract administrative penalties.
+</div>
+{% else %}
+<div class="deadline-banner">
+  <strong>{{ deadline_days }}</strong> day{{ deadline_days|pluralize }} remaining to the CRS filing deadline of {{ deadline_date|date:"j F Y" }} for reporting year {{ REPORTING_YEAR }}.
+</div>
+{% endif %}

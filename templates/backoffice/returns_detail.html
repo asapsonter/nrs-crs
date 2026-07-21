@@ -1,0 +1,125 @@
+{% extends "backoffice/base.html" %}
+{% load pills flags %}
+{% block title %}{{ filing.reference }} · Returns{% endblock %}
+{% block content %}
+<h1>{{ filing.reference }}</h1>
+<p class="page-sub">
+  {{ filing.rfi.legal_name }} &middot; {{ filing.get_kind_display }} ({{ filing.message_type }}) &middot;
+  Reporting year {{ filing.reporting_year }} &middot; {% pill filing.status filing.get_status_display %}
+</p>
+
+<dl class="kv">
+  <dt>Submitted</dt><dd>{{ filing.submitted_at|date:"Y-m-d H:i"|default:"-" }}</dd>
+  <dt>Prepared / submitted by</dt><dd>{{ filing.created_by.display_name|default:"-" }} / {{ filing.checker.display_name|default:"-" }}</dd>
+  <dt>Validated</dt><dd>{{ filing.validated_at|date:"Y-m-d H:i"|default:"not yet validated" }}{% if filing.validated_by %} by {{ filing.validated_by.name|default:"NRS Returns Unit" }}{% endif %}</dd>
+  <dt>Records (live / superseded)</dt><dd>{{ filing.account_reports.count }} total</dd>
+  {% if filing.return_reason %}<dt>Last return reason</dt><dd>{{ filing.return_reason }}</dd>{% endif %}
+</dl>
+
+{% if can_validate %}
+<form method="post" action="/backoffice/returns/{{ filing.pk }}/validate/" style="margin-bottom: 16px;">
+  {% csrf_token %}
+  <button type="submit" class="btn">{% if validated %}Rerun data-quality validation{% else %}Run data-quality validation{% endif %}</button>
+</form>
+{% endif %}
+
+{% if validated %}
+<h2>File-level failures ({{ file_findings|length }})</h2>
+<table class="data">
+  <thead><tr><th>Code</th><th>Severity</th><th>Message</th></tr></thead>
+  <tbody>
+    {% for finding in file_findings %}
+    <tr><td class="mono">{{ finding.code }}</td><td>{% pill finding.severity %}</td><td>{{ finding.message }}</td></tr>
+    {% empty %}
+    <tr><td colspan="3" class="muted">No file-level failures.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Record-level errors ({{ record_findings|length }})</h2>
+<table class="data">
+  <thead><tr><th>DocRefID</th><th>Holder</th><th>Code</th><th>Severity</th><th>Message</th><th>Override</th></tr></thead>
+  <tbody>
+    {% for finding in record_findings %}
+    <tr>
+      <td class="mono">{{ finding.account_report.doc_ref_id }}</td>
+      <td>{{ finding.account_report.holder_name }}</td>
+      <td class="mono">{{ finding.code }}</td>
+      <td>{% pill finding.severity %}</td>
+      <td>{{ finding.message }}
+        {% if finding.overridden %}<br><span class="muted">Overridden by {{ finding.overridden_by.name }}: {{ finding.override_justification }}</span>{% endif %}
+      </td>
+      <td>
+        {% if can_override and finding.severity == 'WARNING' and not finding.overridden %}
+        <form method="post" action="/backoffice/returns/{{ filing.pk }}/findings/{{ finding.pk }}/override/" class="stacked">
+          {% csrf_token %}
+          <input type="text" name="justification" placeholder="Justification" required style="max-width: 200px;">
+          <button type="submit" class="btn small secondary" style="margin-top: 4px;">Override</button>
+        </form>
+        {% elif finding.overridden %}
+        <span class="pill neutral">Overridden</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" class="muted">No record-level errors.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if filing.kind != 'NIL' %}
+<h2>Account reports</h2>
+<table class="data">
+  <thead><tr><th>DocRefID</th><th>Holder</th><th>Residence</th><th>TIN</th><th>Account</th><th>Balance</th><th>Lineage</th></tr></thead>
+  <tbody>
+    {% for record in records %}
+    <tr {% if record.superseded %}style="opacity: 0.55;"{% endif %}>
+      <td class="mono">{{ record.doc_ref_id }}</td>
+      <td>{{ record.holder_name }}</td>
+      <td>{{ record.residence_country|flag }}{{ record.residence_country }}</td>
+      <td class="mono">{{ record.foreign_tin|default:"-" }}</td>
+      <td class="mono">{{ record.account_number }}</td>
+      <td class="num">{{ record.balance }}</td>
+      <td>
+        {% if record.superseded %}<span class="pill neutral">Superseded</span>
+        {% elif record.doc_type_indic == 'OECD2' %}<span class="pill correction">OECD2 corrects {{ record.corr_doc_ref_id }}</span>
+        {% else %}<span class="muted">OECD1</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if can_return %}
+<div class="panel mt">
+  <h2 style="margin-top: 0;">Return to institution</h2>
+  <form method="post" action="/backoffice/returns/{{ filing.pk }}/return/" class="stacked">
+    {% csrf_token %}
+    <label for="reason">Reason (sent to the institution with the record errors)</label>
+    <textarea name="reason" id="reason" rows="3" required></textarea>
+    <div class="actions-row"><button type="submit" class="btn ghost">Return for correction</button></div>
+  </form>
+</div>
+{% endif %}
+
+{% if four_eyes_blocked %}
+<div class="flash error">Four-eyes control: you validated this filing, so approval falls to another supervisor.</div>
+{% endif %}
+
+{% if can_approve %}
+<div class="panel mt">
+  <h2 style="margin-top: 0;">Supervisor approval</h2>
+  <p class="muted">No blocking findings remain. Approval releases the records for exchange packaging.</p>
+  <form method="post" action="/backoffice/returns/{{ filing.pk }}/approve/">
+    {% csrf_token %}
+    <button type="submit" class="btn">Approve for exchange</button>
+  </form>
+</div>
+{% elif validated and blocking_count and filing.status == 'UNDER_VALIDATION' %}
+<div class="flash">{{ blocking_count }} blocking finding{{ blocking_count|pluralize }} must be resolved by return for correction or supervisor override before approval.</div>
+{% endif %}
+
+<div class="back-nav"><a class="btn-back" href="/backoffice/returns/">Back to returns queue</a></div>
+{% endblock %}

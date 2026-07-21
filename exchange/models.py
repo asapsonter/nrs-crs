@@ -1,0 +1,251 @@
+"""Exchange models: partner jurisdictions, CTS packages, status messages."""
+from __future__ import annotations
+
+from decimal import Decimal
+
+from django.db import models
+
+from portal.models import AccountReport
+
+
+class PartnerJurisdiction(models.Model):
+    """An activated CRS MCAA exchange relationship."""
+
+    code = models.CharField(max_length=2, unique=True)
+    name = models.CharField(max_length=80)
+    activated_since = models.DateField()
+    key_fingerprint = models.CharField(max_length=64)
+
+    class Meta:
+        ordering = ["code"]
+
+    def __str__(self) -> str:
+        return f"{self.code} {self.name}"
+
+
+# Simulated CTS pipeline steps, in order. Presentation theatre; the XML and
+# MessageRefID underneath are real.
+PIPELINE_STEPS: list[str] = [
+    "XML generated",
+    "Digitally signed",
+    "AES key generated",
+    "Payload encrypted",
+    "Key wrapped with recipient public key",
+    "Metadata file created",
+    "Uploaded to CTS inbox",
+]
+
+
+class ExchangePackage(models.Model):
+    """A per-jurisdiction, per-year CRS data package sent through the CTS.
+
+    MessageRefID format: sending country + year + receiving country + unique
+    id, for example NG2025GB000123. A package rejected at file level is
+    resubmitted whole; record errors open a CRS702 correction cycle.
+    """
+
+    class Status(models.TextChoices):
+        BUILT = "BUILT", "Built"
+        TRANSMITTING = "TRANSMITTING", "Transmitting"
+        TRANSMITTED = "TRANSMITTED", "Transmitted"
+        ACCEPTED = "ACCEPTED", "Accepted"
+        FILE_ERROR = "FILE_ERROR", "Rejected, file error"
+        RECORD_ERRORS = "RECORD_ERRORS", "Record errors reported"
+        ARCHIVED = "ARCHIVED", "Archived"
+
+    jurisdiction = models.ForeignKey(PartnerJurisdiction, on_delete=models.PROTECT, related_name="packages")
+    reporting_year = models.PositiveIntegerField()
+    message_ref_id = models.CharField(max_length=40, unique=True)
+    message_type = models.CharField(
+        max_length=8,
+        choices=[("CRS701", "CRS701 New data"), ("CRS702", "CRS702 Corrections")],
+        default="CRS701",
+    )
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.BUILT)
+    pipeline_step = models.PositiveSmallIntegerField(default=1)
+    xml_content = models.TextField(blank=True, default="")
+    records = models.ManyToManyField(AccountReport, related_name="packages")
+    corrects_package = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="correction_packages"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    transmitted_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.message_ref_id
+
+    @property
+    def pipeline_complete(self) -> bool:
+        return self.pipeline_step >= len(PIPELINE_STEPS)
+
+    def pipeline_display(self) -> list[dict]:
+        """Step list with done/current flags for the pipeline template."""
+        steps = []
+        for index, label in enumerate(PIPELINE_STEPS, start=1):
+            steps.append(
+                {
+                    "label": label,
+                    "done": index < self.pipeline_step
+                    or (self.pipeline_complete and index <= self.pipeline_step),
+                    "current": index == self.pipeline_step and not self.pipeline_complete,
+                }
+            )
+        return steps
+
+
+class StatusMessage(models.Model):
+    """A CRS Status Message, either received on our outgoing package or
+    issued by the NRS on a partner's inbound file."""
+
+    class Direction(models.TextChoices):
+        INBOUND = "INBOUND", "Received from partner"
+        OUTBOUND = "OUTBOUND", "Issued to partner"
+
+    class Outcome(models.TextChoices):
+        ACCEPTED = "ACCEPTED", "Accepted"
+        FILE_ERROR = "FILE_ERROR", "File error"
+        RECORD_ERROR = "RECORD_ERROR", "Record errors"
+
+    direction = models.CharField(max_length=10, choices=Direction.choices)
+    outcome = models.CharField(max_length=14, choices=Outcome.choices)
+    package = models.ForeignKey(
+        ExchangePackage, null=True, blank=True, on_delete=models.CASCADE, related_name="status_messages"
+    )
+    inbound_file = models.ForeignKey(
+        "InboundFile", null=True, blank=True, on_delete=models.CASCADE, related_name="status_messages"
+    )
+    error_code = models.CharField(max_length=10, blank=True, default="")
+    detail = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.get_direction_display()}: {self.get_outcome_display()}"
+
+
+class RecordError(models.Model):
+    """A record-level error named in a Status Message, worked in the
+    correction queue until a CRS702 correction resolves it."""
+
+    status_message = models.ForeignKey(StatusMessage, on_delete=models.CASCADE, related_name="record_errors")
+    doc_ref_id = models.CharField(max_length=80)
+    code = models.CharField(max_length=10)
+    detail = models.CharField(max_length=200)
+    resolved = models.BooleanField(default=False)
+    correction_record = models.ForeignKey(
+        AccountReport, null=True, blank=True, on_delete=models.SET_NULL, related_name="resolves_errors"
+    )
+
+    class Meta:
+        ordering = ["doc_ref_id"]
+
+    def __str__(self) -> str:
+        return f"{self.doc_ref_id}: {self.code}"
+
+
+class Taxpayer(models.Model):
+    """A Nigerian taxpayer on the domestic register.
+
+    Inbound partner records are matched against this register on TIN and
+    identity to route foreign account data to the right taxpayer for
+    compliance use. A minimal register that stands in for the wider NRS
+    taxpayer database in the demo.
+    """
+
+    tin = models.CharField("Nigerian TIN", max_length=40, unique=True)
+    name = models.CharField(max_length=200)
+    tax_office = models.CharField(max_length=120, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    registered_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.tin})"
+
+
+class InboundFile(models.Model):
+    """A CRS data file received from a partner jurisdiction.
+
+    Processing runs decrypt plus schema check (file level), then record-level
+    checks. A clean file is accepted, approved for domestic use, matched to
+    Nigerian taxpayers, and disseminated to the Tax Authority View.
+    """
+
+    class Status(models.TextChoices):
+        RECEIVED = "RECEIVED", "Received"
+        FILE_ERROR = "FILE_ERROR", "Rejected, file error"
+        RECORD_ERRORS = "RECORD_ERRORS", "Record errors outstanding"
+        ACCEPTED = "ACCEPTED", "Accepted"
+        APPROVED = "APPROVED", "Approved for domestic use"
+        MATCHED = "MATCHED", "Matched to taxpayers"
+        DISSEMINATED = "DISSEMINATED", "Disseminated"
+
+    jurisdiction = models.ForeignKey(PartnerJurisdiction, on_delete=models.PROTECT, related_name="inbound_files")
+    reporting_year = models.PositiveIntegerField()
+    message_ref_id = models.CharField(max_length=40, unique=True)
+    status = models.CharField(max_length=14, choices=Status.choices, default=Status.RECEIVED)
+    simulate_file_error = models.CharField(max_length=10, blank=True, default="")
+    received_at = models.DateTimeField(auto_now_add=True)
+    file_checked_at = models.DateTimeField(null=True, blank=True)
+    records_checked_at = models.DateTimeField(null=True, blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    matched_at = models.DateTimeField(null=True, blank=True)
+    disseminated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-received_at"]
+
+    def __str__(self) -> str:
+        return self.message_ref_id
+
+
+class InboundRecord(models.Model):
+    """One account record inside a partner's inbound file, concerning a
+    Nigerian-resident account holder."""
+
+    class MatchStatus(models.TextChoices):
+        UNMATCHED = "UNMATCHED", "Unmatched"
+        MATCHED = "MATCHED", "Matched"
+
+    class RiskRating(models.TextChoices):
+        GENERAL = "GENERAL", "General monitoring"
+        SPECIFIC = "SPECIFIC", "Specific review"
+        ENHANCED = "ENHANCED", "Enhanced review"
+
+    file = models.ForeignKey(InboundFile, on_delete=models.CASCADE, related_name="records")
+    doc_ref_id = models.CharField(max_length=80)
+    holder_name = models.CharField(max_length=200)
+    ng_tin = models.CharField("Nigerian TIN", max_length=40, blank=True, default="")
+    account_number = models.CharField(max_length=40)
+    balance = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
+    currency = models.CharField(max_length=3, default="USD")
+    has_error = models.BooleanField(default=False)
+    error_code = models.CharField(max_length=10, blank=True, default="")
+    error_detail = models.CharField(max_length=200, blank=True, default="")
+    corrected = models.BooleanField(default=False)
+
+    # Taxpayer matching (IB-08/09): a record is matched to a domestic taxpayer
+    # on TIN or identity, then risk-profiled for the appropriate review track.
+    match_status = models.CharField(
+        max_length=10, choices=MatchStatus.choices, default=MatchStatus.UNMATCHED
+    )
+    match_basis = models.CharField(max_length=20, blank=True, default="")
+    matched_taxpayer = models.ForeignKey(
+        Taxpayer, null=True, blank=True, on_delete=models.SET_NULL, related_name="inbound_records"
+    )
+    risk_rating = models.CharField(max_length=8, choices=RiskRating.choices, blank=True, default="")
+    match_attempts = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["doc_ref_id"]
+
+    def __str__(self) -> str:
+        return f"{self.doc_ref_id} {self.holder_name}"

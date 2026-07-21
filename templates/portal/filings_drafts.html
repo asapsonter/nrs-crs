@@ -1,0 +1,34 @@
+{% extends "portal/base.html" %}
+{% load pills %}
+{% block title %}Draft Filings · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+{% include "portal/deadline_banner.html" %}
+<h1>Draft Filings</h1>
+<p class="page-sub">Returns still in your hands: drafts you are preparing, filings pending Checker review, and filings the NRS has returned for correction.</p>
+
+<div class="list-toolbar">
+  <span class="list-count">{{ filings|length }} draft{{ filings|length|pluralize }} <span class="dim">in progress</span></span>
+  <div class="actions-row">
+    <a class="btn" href="/portal/submit/">Start a new submission</a>
+  </div>
+</div>
+
+<table class="data">
+  <thead><tr><th>Reference</th><th>Year</th><th>Type</th><th>Records</th><th>Status</th><th>Created</th><th></th></tr></thead>
+  <tbody>
+    {% for filing in filings %}
+    <tr>
+      <td class="mono">{{ filing.reference }}</td>
+      <td>{{ filing.reporting_year }}</td>
+      <td>{{ filing.get_kind_display }} ({{ filing.message_type }})</td>
+      <td class="num">{{ filing.record_count }}</td>
+      <td>{% pill filing.status filing.get_status_display %}</td>
+      <td>{{ filing.created_at|date:"Y-m-d" }}</td>
+      <td><a href="/portal/filings/{{ filing.pk }}/">Open</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">No draft filings. Start one under Submissions.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

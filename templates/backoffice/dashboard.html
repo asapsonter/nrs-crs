@@ -1,0 +1,23 @@
+{% extends "backoffice/base.html" %}
+{% block title %}Dashboard · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Supervision Centre</h1>
+<p class="page-sub">Reporting year {{ year }}. Queue positions across the AEOI-CRS workflow. Figures your role can act on link to their queue; the remainder are shown for context.</p>
+<div class="card-grid">
+  {% for card in cards %}
+  {% if card.clickable %}
+  <a class="stat-card" href="{{ card.url }}">
+    <div class="label">{{ card.label }}</div>
+    <div class="value {% if card.alert %}alert{% endif %}">{{ card.value }}</div>
+    <div class="card-cta">Open queue &rarr;</div>
+  </a>
+  {% else %}
+  <div class="stat-card static">
+    <div class="label">{{ card.label }}</div>
+    <div class="value {% if card.alert %}alert{% endif %}">{{ card.value }}</div>
+    <div class="card-cta muted-cta">For context</div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

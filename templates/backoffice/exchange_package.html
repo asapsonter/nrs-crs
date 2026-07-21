@@ -1,0 +1,125 @@
+{% extends "backoffice/base.html" %}
+{% load pills flags %}
+{% block title %}{{ package.message_ref_id }} · Exchange{% endblock %}
+{% block content %}
+<h1 class="mono">{{ package.message_ref_id }}</h1>
+<p class="page-sub">
+  {{ package.message_type }} to {{ package.jurisdiction.code|flag }}{{ package.jurisdiction.name }} ({{ package.jurisdiction.code }}) &middot;
+  Reporting year {{ package.reporting_year }} &middot; {% pill package.status package.get_status_display %}
+  {% if package.corrects_package %} &middot; corrects <a href="/backoffice/exchange/packages/{{ package.corrects_package.pk }}/" class="mono">{{ package.corrects_package.message_ref_id }}</a>{% endif %}
+</p>
+
+<div class="panel">
+  <h2 style="margin-top: 0;">Transmission pipeline</h2>
+  <ul class="pipeline">
+    {% for step in pipeline %}
+    <li class="{% if step.done %}done{% elif step.current %}current{% endif %}">
+      <span class="dot"></span>{{ step.label }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% if can_transmit and 'operate_exchange' in bo_caps %}
+  <form method="post" action="/backoffice/exchange/packages/{{ package.pk }}/advance/">
+    {% csrf_token %}
+    <button type="submit" class="btn">Run next step</button>
+  </form>
+  {% endif %}
+  {% if package.status == 'FILE_ERROR' and 'operate_exchange' in bo_caps %}
+  <form method="post" action="/backoffice/exchange/packages/{{ package.pk }}/resubmit/">
+    {% csrf_token %}
+    <button type="submit" class="btn">Rebuild for resubmission (new MessageRefID)</button>
+  </form>
+  {% endif %}
+  <p class="muted mt">Recipient key fingerprint: <span class="mono">{{ package.jurisdiction.key_fingerprint }}</span></p>
+</div>
+
+{% if status_messages %}
+<h2>Status Messages</h2>
+<table class="data">
+  <thead><tr><th>Received</th><th>Direction</th><th>Outcome</th><th>Code</th><th>Detail</th></tr></thead>
+  <tbody>
+    {% for message in status_messages %}
+    <tr>
+      <td>{{ message.created_at|date:"Y-m-d H:i" }}</td>
+      <td>{{ message.get_direction_display }}</td>
+      <td>{% pill message.outcome message.get_outcome_display %}</td>
+      <td class="mono">{{ message.error_code|default:"-" }}</td>
+      <td>{{ message.detail }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if open_errors %}
+<div class="flash error">
+  {{ open_errors|length }} open record error(s) on this package.
+  <a href="/backoffice/exchange/corrections/">Open the correction queue</a> to prepare the CRS702 correction message.
+</div>
+{% endif %}
+
+{% if awaiting_partner and 'operate_exchange' in bo_caps %}
+<div class="panel band">
+  <h2 style="margin-top: 0;">Demo control: act as {{ package.jurisdiction.code|flag }}{{ package.jurisdiction.name }}</h2>
+  <form method="post" action="/backoffice/exchange/packages/{{ package.pk }}/partner-response/" class="stacked">
+    {% csrf_token %}
+    <label>Response</label>
+    <div class="checkbox-row"><input type="radio" name="outcome" value="accept" id="oc_accept" checked><label for="oc_accept" style="margin: 0;">Accept the package</label></div>
+    <div class="checkbox-row"><input type="radio" name="outcome" value="file_error" id="oc_file"><label for="oc_file" style="margin: 0;">Reject with a file error</label></div>
+    <select name="file_error_code" style="max-width: 320px;">
+      {% for code, label in file_error_choices %}
+      <option value="{{ code }}">{{ code }} {{ label }}</option>
+      {% endfor %}
+    </select>
+    <div class="checkbox-row"><input type="radio" name="outcome" value="record_errors" id="oc_rec"><label for="oc_rec" style="margin: 0;">Report record errors on the selected records below</label></div>
+    <select name="record_error_code" style="max-width: 320px;">
+      {% for code, label in record_error_choices %}
+      <option value="{{ code }}">{{ code }} {{ label }}</option>
+      {% endfor %}
+    </select>
+    <div class="actions-row"><button type="submit" class="btn dark">Send partner response</button></div>
+
+    <h2 class="mt">Records in this package</h2>
+    <table class="data">
+      <thead><tr><th></th><th>DocRefID</th><th>RFI</th><th>Holder</th><th>TIN</th><th>Balance</th><th>Lineage</th></tr></thead>
+      <tbody>
+        {% for record in records %}
+        <tr>
+          <td><input type="checkbox" name="record_ids" value="{{ record.pk }}"></td>
+          <td class="mono">{{ record.doc_ref_id }}</td>
+          <td>{{ record.filing.rfi.legal_name }}</td>
+          <td>{{ record.holder_name }}</td>
+          <td class="mono">{{ record.foreign_tin|default:"-" }}</td>
+          <td class="num">{{ record.balance }}</td>
+          <td>{% if record.doc_type_indic != 'OECD1' %}<span class="pill correction">{{ record.doc_type_indic }} corrects {{ record.corr_doc_ref_id }}</span>{% else %}<span class="muted">OECD1</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </form>
+</div>
+{% else %}
+<h2>Records in this package</h2>
+<table class="data">
+  <thead><tr><th>DocRefID</th><th>RFI</th><th>Holder</th><th>Residence</th><th>TIN</th><th>Balance</th><th>Lineage</th></tr></thead>
+  <tbody>
+    {% for record in records %}
+    <tr>
+      <td class="mono">{{ record.doc_ref_id }}</td>
+      <td>{{ record.filing.rfi.legal_name }}</td>
+      <td>{{ record.holder_name }}</td>
+      <td>{{ record.residence_country|flag }}{{ record.residence_country }}</td>
+      <td class="mono">{{ record.foreign_tin|default:"-" }}</td>
+      <td class="num">{{ record.balance }}</td>
+      <td>{% if record.doc_type_indic != 'OECD1' %}<span class="pill correction">{{ record.doc_type_indic }} corrects {{ record.corr_doc_ref_id }}</span>{% else %}<span class="muted">OECD1</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Generated CRS XML</h2>
+<pre class="xml">{{ package.xml_content }}</pre>
+
+<div class="back-nav"><a class="btn-back" href="/backoffice/exchange/">Back to exchange workspace</a></div>
+{% endblock %}

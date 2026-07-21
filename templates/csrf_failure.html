@@ -1,0 +1,23 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session refreshed · NRS AEOI-CRS</title>
+<link rel="stylesheet" href="{% static css %}">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-box">
+    <div class="org">Nigeria Revenue Service</div>
+    <div class="sys">AEOI-CRS{% if surface == 'backoffice' %} · Supervision Centre{% else %} · Reporting Financial Institutions{% endif %}</div>
+    <h2 style="font-size: 18px; margin: 18px 0 8px;">Your session was refreshed</h2>
+    <p class="muted" style="line-height: 1.6;">For security, the form's token is refreshed after you sign in or leave a page open for a while, so the page you submitted was out of date. Nothing was lost. Reload the page and submit again.</p>
+    <div class="actions-row">
+      <a class="btn" href="{{ back }}">Reload the page</a>
+      <a class="btn secondary" href="{{ home }}">Go to {% if surface == 'backoffice' %}the Supervision Centre{% else %}the portal{% endif %}</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

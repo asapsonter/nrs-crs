@@ -1,0 +1,56 @@
+{% extends "backoffice/base.html" %}
+{% block title %}Live Sessions · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Live Sessions</h1>
+<p class="page-sub">Credentials currently bound to a session, with remaining time. Revocation ends the session on its next request.</p>
+
+<table class="data">
+  <thead><tr><th>Username</th><th>Officer</th><th>Role</th><th>First use</th><th>Session ends</th><th>Remaining</th><th></th></tr></thead>
+  <tbody>
+    {% for credential in active %}
+    <tr>
+      <td class="mono">{{ credential.username }}</td>
+      <td>{{ credential.officer.name }}</td>
+      <td>{{ credential.role_display }}</td>
+      <td>{{ credential.first_used_at|date:"Y-m-d H:i" }}</td>
+      <td>{{ credential.session_expires_at|date:"Y-m-d H:i" }}</td>
+      <td class="mono">{{ credential.remaining_seconds }} s</td>
+      <td>
+        <form method="post" action="/backoffice/admin-console/credentials/{{ credential.pk }}/revoke/" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="/backoffice/admin-console/sessions/">
+          <button type="submit" class="btn ghost small">Revoke now</button>
+        </form>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">No live sessions.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Issued, awaiting first use</h2>
+<table class="data">
+  <thead><tr><th>Username</th><th>Officer</th><th>Role</th><th>Issued</th><th>Lapses if unused</th><th></th></tr></thead>
+  <tbody>
+    {% for credential in pending %}
+    <tr>
+      <td class="mono">{{ credential.username }}</td>
+      <td>{{ credential.officer.name }}</td>
+      <td>{{ credential.role_display }}</td>
+      <td>{{ credential.issued_at|date:"Y-m-d H:i" }}</td>
+      <td>{{ credential.expires_if_unused_at|date:"Y-m-d H:i" }}</td>
+      <td>
+        <form method="post" action="/backoffice/admin-console/credentials/{{ credential.pk }}/revoke/" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="/backoffice/admin-console/sessions/">
+          <button type="submit" class="btn ghost small">Revoke</button>
+        </form>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" class="muted">None awaiting first use.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

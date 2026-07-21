@@ -1,0 +1,40 @@
+{% extends "portal/base.html" %}
+{% load pills %}
+{% block title %}Reporting Entity Profile · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<h1>Reporting Entity Profile</h1>
+<p class="page-sub">The enrolment record for {{ rfi.legal_name }}. To change any of these details, contact the NRS AEOI-CRS unit.</p>
+
+<div class="detail-panels">
+  <section class="panel">
+    <h2>Entity</h2>
+    <dl class="kv">
+      <dt>Reference</dt><dd class="mono">{{ rfi.reference }}</dd>
+      <dt>Legal name</dt><dd>{{ rfi.legal_name }}</dd>
+      <dt>Enrolment type</dt><dd>{{ rfi.get_enrolment_type_display }}</dd>
+      <dt>Category</dt><dd>{{ rfi.get_category_display }}</dd>
+      <dt>TIN</dt><dd class="mono">{{ rfi.tin }}</dd>
+      <dt>Status</dt><dd>{% pill rfi.status rfi.get_status_display %}</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>Contact</h2>
+    <dl class="kv">
+      <dt>Email</dt><dd>{{ rfi.email|default:"-" }}</dd>
+      <dt>Phone</dt><dd>{{ rfi.full_phone|default:"-" }}</dd>
+      <dt>Registered address</dt><dd>{{ rfi.full_address|default:"-" }}</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>Primary User</h2>
+    <dl class="kv">
+      <dt>Name</dt><dd>{{ rfi.pu_name|default:"-" }}</dd>
+      <dt>Position</dt><dd>{{ rfi.pu_designation|default:"-" }}</dd>
+      <dt>Email</dt><dd>{{ rfi.pu_email }}</dd>
+      <dt>Phone</dt><dd>{{ rfi.pu_full_phone|default:"-" }}</dd>
+    </dl>
+  </section>
+</div>
+{% endblock %}

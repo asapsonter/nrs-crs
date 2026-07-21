@@ -1,0 +1,49 @@
+{% extends "portal/base.html" %}
+{% load pills %}
+{% block title %}Application Status · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<div class="public-wrap" style="padding-top: 10px;">
+<h1>Application status</h1>
+<p class="lead">Enter the reference number issued at submission.</p>
+<form method="post" class="stacked">
+  {% csrf_token %}
+  <label for="reference">Reference number</label>
+  <input type="text" name="reference" id="reference" placeholder="NRS-RFI-2025-0001" required>
+  <div class="actions-row"><button type="submit" class="btn">Check status</button></div>
+</form>
+
+{% if searched %}
+  {% if rfi %}
+  <div class="panel mt">
+    <dl class="kv">
+      <dt>Reference</dt><dd class="mono">{{ rfi.reference }}</dd>
+      <dt>Institution</dt><dd>{{ rfi.legal_name }}</dd>
+      <dt>Submitted</dt><dd>{{ rfi.submitted_at|date:"j F Y" }}</dd>
+      <dt>Current status</dt><dd>{% pill rfi.status rfi.get_status_display %}</dd>
+      {% if rfi.status == 'REJECTED' %}
+      <dt>Reason</dt><dd>{{ rfi.rejection_reason }}</dd>
+      {% endif %}
+    </dl>
+
+    <h2>Status history</h2>
+    <table class="data">
+      <thead><tr><th>Status</th><th>Date</th><th>Detail</th></tr></thead>
+      <tbody>
+        {% for event in rfi.status_events.all %}
+        <tr>
+          <td>{% pill event.status event.status_label %}</td>
+          <td>{{ event.changed_at|date:"j F Y, H:i" }}</td>
+          <td class="muted">{{ event.note|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td>{% pill rfi.status rfi.get_status_display %}</td><td>{{ rfi.submitted_at|date:"j F Y, H:i" }}</td><td class="muted">Application submitted.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="error-text mt">No application found for that reference.</div>
+  {% endif %}
+{% endif %}
+</div>
+{% endblock %}

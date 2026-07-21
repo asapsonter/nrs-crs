@@ -1,0 +1,47 @@
+{% extends "backoffice/base.html" %}
+{% block title %}{{ officer.name }} · Credential History{% endblock %}
+{% block content %}
+<h1>{{ officer.name }}</h1>
+<p class="page-sub">{{ officer.role_display }} &middot; {{ officer.email }}</p>
+
+<div class="panel band">
+  <h2 style="margin-top: 0;">Assigned roles</h2>
+  <form method="post" action="/backoffice/admin-console/officers/{{ officer.pk }}/roles/" class="stacked">
+    {% csrf_token %}
+    {% for value, label in role_choices %}
+    <div class="checkbox-row">
+      <input type="checkbox" name="roles" value="{{ value }}" id="role_{{ value }}" {% if value in officer.role_list %}checked{% endif %}>
+      <label for="role_{{ value }}" style="margin: 0;">{{ label }}</label>
+    </div>
+    {% endfor %}
+    <div class="actions-row"><button type="submit" class="btn">Update roles</button></div>
+  </form>
+</div>
+
+<h2>Credential history</h2>
+<table class="data">
+  <thead><tr><th>Username</th><th>Roles</th><th>Issued</th><th>Window</th><th>First use</th><th>Session end</th><th>Status</th></tr></thead>
+  <tbody>
+    {% for credential in credentials %}
+    <tr>
+      <td class="mono">{{ credential.username }}</td>
+      <td>{{ credential.role_display }}</td>
+      <td>{{ credential.issued_at|date:"Y-m-d H:i" }}</td>
+      <td>{{ credential.session_hours }} h</td>
+      <td>{{ credential.first_used_at|date:"Y-m-d H:i"|default:"never used" }}</td>
+      <td>{{ credential.session_expires_at|date:"Y-m-d H:i"|default:"-" }}</td>
+      <td>
+        {% if credential.status == 'ISSUED' %}<span class="pill review">Issued</span>
+        {% elif credential.status == 'ACTIVE' %}<span class="pill active-state">Active</span>
+        {% elif credential.status == 'CONSUMED' %}<span class="pill neutral">Consumed</span>
+        {% elif credential.status == 'REVOKED' %}<span class="pill rejected">Revoked</span>
+        {% else %}<span class="pill draft">Expired</span>{% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">No credentials issued to this officer.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="back-nav"><a class="btn-back" href="/backoffice/admin-console/officers/">Back to officers</a></div>
+{% endblock %}

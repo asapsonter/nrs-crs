@@ -1,0 +1,35 @@
+{% extends "portal/base.html" %}
+{% block title %}Sign In · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <aside class="auth-hero">
+    <div class="crest">NRS AEOI-CRS Portal</div>
+    <div class="crest-underline"></div>
+    <h1>Reporting Financial Institutions</h1>
+    <p class="hero-lead">The official channel for enrolment, filing, and correction of Common Reporting Standard returns with the Nigeria Revenue Service.</p>
+    <ul class="auth-points">
+      <li><span class="tick">&#10003;</span> Enrol your institution and appoint a Primary User</li>
+      <li><span class="tick">&#10003;</span> File CRS returns by upload, manual entry, or nil return</li>
+      <li><span class="tick">&#10003;</span> Track validation, corrections, and exchange status</li>
+    </ul>
+    <p class="hero-cta">Not yet enrolled? <a href="/portal/enrol/">Apply for enrolment</a></p>
+  </aside>
+
+  <main class="auth-panel">
+    <div class="auth-form">
+      <h2>Sign in</h2>
+      <p class="auth-sub">For approved Reporting Financial Institution users.</p>
+      {% if error %}<div class="error-text">{{ error }}</div>{% endif %}
+      <form method="post" class="stacked">
+        {% csrf_token %}
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="name@institution.ng" autofocus required>
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required>
+        <button type="submit" class="btn block">Sign in</button>
+      </form>
+      <p class="auth-foot">Access is limited to users of approved institutions. New institutions should <a href="/portal/enrol/">apply for enrolment</a>.</p>
+    </div>
+  </main>
+</div>
+{% endblock %}

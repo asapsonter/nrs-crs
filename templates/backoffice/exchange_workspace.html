@@ -1,0 +1,55 @@
+{% extends "backoffice/base.html" %}
+{% load pills flags %}
+{% block title %}Exchange · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Exchange workspace</h1>
+<p class="page-sub">Outgoing CRS packages through the Common Transmission System. {{ deadline_days }} day{{ deadline_days|pluralize }} to the 30 September exchange deadline.</p>
+
+<div class="panel band">
+  <h2 style="margin-top: 0;">Package builder</h2>
+  <p class="muted">{{ eligible_records }} approved record(s) are awaiting packaging. Building sorts them by account holder residence jurisdiction into one package per activated partner.</p>
+  {% if 'operate_exchange' in bo_caps %}
+  <form method="post" action="/backoffice/exchange/build/">
+    {% csrf_token %}
+    <button type="submit" class="btn" {% if not eligible_records %}disabled{% endif %}>Build exchange packages</button>
+  </form>
+  {% else %}
+  <p class="muted">You hold read-only access to exchange data.</p>
+  {% endif %}
+</div>
+
+<h2>Outgoing packages</h2>
+<table class="data">
+  <thead><tr><th>MessageRefID</th><th>Partner</th><th>Type</th><th>Records</th><th>Status</th><th>Created</th><th></th></tr></thead>
+  <tbody>
+    {% for package in packages %}
+    <tr>
+      <td class="mono">{{ package.message_ref_id }}</td>
+      <td>{% country package.jurisdiction.code package.jurisdiction.name %}</td>
+      <td>{{ package.message_type }}</td>
+      <td class="num">{{ package.records.count }}</td>
+      <td>{% pill package.status package.get_status_display %}</td>
+      <td>{{ package.created_at|date:"Y-m-d H:i" }}</td>
+      <td><a href="/backoffice/exchange/packages/{{ package.pk }}/">Open</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">No packages built yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Activated partner jurisdictions</h2>
+<table class="data">
+  <thead><tr><th>Code</th><th>Jurisdiction</th><th>Activated since</th><th>Public key fingerprint</th></tr></thead>
+  <tbody>
+    {% for partner in partners %}
+    <tr>
+      <td class="mono">{{ partner.code|flag }}{{ partner.code }}</td>
+      <td>{{ partner.name }}</td>
+      <td>{{ partner.activated_since|date:"Y-m-d" }}</td>
+      <td class="mono">{{ partner.key_fingerprint }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

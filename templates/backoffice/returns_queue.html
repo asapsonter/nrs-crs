@@ -1,0 +1,97 @@
+{% extends "backoffice/base.html" %}
+{% load pills %}
+{% block title %}Returns · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Returns workspace</h1>
+<p class="page-sub">Data-quality validation and four-eyes approval of submitted CRS filings.</p>
+
+<h2>Awaiting validation</h2>
+<table class="data">
+  <thead><tr><th>Reference</th><th>Institution</th><th>Type</th><th>Records</th><th>Submitted</th><th></th></tr></thead>
+  <tbody>
+    {% for filing in awaiting_validation %}
+    <tr>
+      <td class="mono">{{ filing.reference }}</td>
+      <td>{{ filing.rfi.legal_name }}</td>
+      <td>{{ filing.get_kind_display }} ({{ filing.message_type }})</td>
+      <td class="num">{{ filing.record_count }}</td>
+      <td>{{ filing.submitted_at|date:"Y-m-d H:i" }}</td>
+      <td><a href="/backoffice/returns/{{ filing.pk }}/">Open</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" class="muted">Nothing awaiting validation.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Under validation / awaiting approval</h2>
+<table class="data">
+  <thead><tr><th>Reference</th><th>Institution</th><th>Findings</th><th>Validated by</th><th></th></tr></thead>
+  <tbody>
+    {% for filing in under_validation %}
+    <tr>
+      <td class="mono">{{ filing.reference }}</td>
+      <td>{{ filing.rfi.legal_name }}</td>
+      <td class="num">{{ filing.findings.count }}</td>
+      <td>{{ filing.validated_by.name|default:"NRS Returns Unit" }}</td>
+      <td><a href="/backoffice/returns/{{ filing.pk }}/">Open</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="muted">Nothing under validation.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Returned to institutions</h2>
+<table class="data">
+  <thead><tr><th>Reference</th><th>Institution</th><th>Returned</th><th>Reason</th></tr></thead>
+  <tbody>
+    {% for filing in returned %}
+    <tr>
+      <td class="mono"><a href="/backoffice/returns/{{ filing.pk }}/">{{ filing.reference }}</a></td>
+      <td>{{ filing.rfi.legal_name }}</td>
+      <td>{{ filing.returned_at|date:"Y-m-d" }}</td>
+      <td class="muted">{{ filing.return_reason|truncatechars:90 }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4" class="muted">Nothing outstanding with institutions.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Accepted</h2>
+<table class="data">
+  <thead><tr><th>Reference</th><th>Institution</th><th>Status</th><th>Approved by</th><th>Accepted</th></tr></thead>
+  <tbody>
+    {% for filing in accepted %}
+    <tr>
+      <td class="mono"><a href="/backoffice/returns/{{ filing.pk }}/">{{ filing.reference }}</a></td>
+      <td>{{ filing.rfi.legal_name }}</td>
+      <td>{% pill filing.status filing.get_status_display %}</td>
+      <td>{{ filing.approved_by.name|default:"NRS Returns Unit" }}</td>
+      <td>{{ filing.accepted_at|date:"Y-m-d" }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="muted">No accepted filings.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Nil return register ({{ nil_returns|length }})</h2>
+<table class="data">
+  <thead><tr><th>Reference</th><th>Institution</th><th>Year</th><th>Status</th><th>Filed</th></tr></thead>
+  <tbody>
+    {% for filing in nil_returns %}
+    <tr>
+      <td class="mono"><a href="/backoffice/returns/{{ filing.pk }}/">{{ filing.reference }}</a></td>
+      <td>{{ filing.rfi.legal_name }}</td>
+      <td>{{ filing.reporting_year }}</td>
+      <td>{% pill filing.status filing.get_status_display %}</td>
+      <td>{{ filing.submitted_at|date:"Y-m-d"|default:"-" }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="muted">No nil returns this cycle.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

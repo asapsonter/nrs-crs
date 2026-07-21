@@ -1,0 +1,54 @@
+{% extends "portal/base.html" %}
+{% load pills %}
+{% block title %}Users · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+{% include "portal/deadline_banner.html" %}
+<h1>Portal users</h1>
+<p class="page-sub">{{ rfi.legal_name }}. Makers prepare filings; Checkers review and submit. Maker registrations take effect once approved by a Checker.</p>
+
+<table class="data">
+  <thead><tr><th>Name</th><th>Designation</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+    {% for portal_user in portal_users %}
+    <tr>
+      <td>{{ portal_user.display_name }}{% if portal_user.is_primary_user %} <span class="muted">(Primary User)</span>{% endif %}</td>
+      <td>{{ portal_user.designation|default:"-" }}</td>
+      <td>{{ portal_user.user.email }}</td>
+      <td>{{ portal_user.get_role_display }}</td>
+      <td>{% pill portal_user.status portal_user.get_status_display %}</td>
+      <td>
+        {% if portal_user.status == 'PENDING' %}
+        <form method="post" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="approve">
+          <input type="hidden" name="user_id" value="{{ portal_user.pk }}">
+          <button type="submit" class="btn small">Approve registration</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="panel band mt">
+  <h2 style="margin-top: 0;">Invite a user</h2>
+  <form method="post" class="stacked">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="invite">
+    <label for="name">Full name</label>
+    <input type="text" name="name" id="name" required>
+    <label for="designation">Designation</label>
+    <input type="text" name="designation" id="designation">
+    <label for="email">Email</label>
+    <input type="email" name="email" id="email" required>
+    <label for="role">Role</label>
+    <select name="role" id="role">
+      {% for value, label in role_choices %}
+      <option value="{{ value }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+    <div class="actions-row"><button type="submit" class="btn">Create account</button></div>
+  </form>
+</div>
+{% endblock %}

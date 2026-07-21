@@ -1,0 +1,40 @@
+{% extends "portal/base.html" %}
+{% block title %}Upload CRS XML · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+{% include "portal/deadline_banner.html" %}
+<h1>Upload CRS XML</h1>
+<p class="page-sub">The file is validated against the NRS simplified CRS filing schema. Malformed files are rejected with line-level messages.</p>
+
+{% if errors %}
+<div class="error-text">
+  <strong>The file was rejected.</strong><br>
+  {% for error in errors %}{{ error }}<br>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="stacked">
+  {% csrf_token %}
+  <label for="crs_file">CRS filing document (XML)</label>
+  <input type="file" name="crs_file" id="crs_file" accept=".xml,text/xml" required>
+  <div class="actions-row">
+    <button type="submit" class="btn">Validate and stage</button>
+    <a class="btn secondary" href="/portal/filings/">Cancel</a>
+  </div>
+</form>
+
+<div class="panel band mt">
+  <h2 style="margin-top: 0;">Expected structure</h2>
+<pre class="mono" style="font-size: 12px; line-height: 1.5;">&lt;CRSFiling year="{{ REPORTING_YEAR }}"&gt;
+  &lt;ReportingFI tin="0450088801" name="Institution Legal Name"/&gt;
+  &lt;AccountReport&gt;
+    &lt;HolderName&gt;Jane Example&lt;/HolderName&gt;
+    &lt;HolderType&gt;INDIVIDUAL&lt;/HolderType&gt;
+    &lt;ResCountry&gt;GB&lt;/ResCountry&gt;
+    &lt;TIN&gt;QQ123456C&lt;/TIN&gt;
+    &lt;AccountNumber&gt;0011223344&lt;/AccountNumber&gt;
+    &lt;Balance&gt;25000000.00&lt;/Balance&gt;
+    &lt;Interest&gt;120000.00&lt;/Interest&gt;
+  &lt;/AccountReport&gt;
+&lt;/CRSFiling&gt;</pre>
+</div>
+{% endblock %}

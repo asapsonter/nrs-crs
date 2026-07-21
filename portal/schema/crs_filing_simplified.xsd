@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Simplified CRS filing schema for the NRS AEOI-CRS demonstration platform.
+Derived from the OECD CRS XML Schema v2.0 AccountReport structure, reduced
+to the fields collected in the demo. Uploaded documents are validated
+against this structure in code.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="CRSFiling">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="ReportingFI">
+          <xs:complexType>
+            <xs:attribute name="tin" type="xs:string" use="required"/>
+            <xs:attribute name="name" type="xs:string" use="required"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="AccountReport" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="HolderName" type="xs:string"/>
+              <xs:element name="HolderType" minOccurs="0">
+                <xs:simpleType>
+                  <xs:restriction base="xs:string">
+                    <xs:enumeration value="INDIVIDUAL"/>
+                    <xs:enumeration value="ORGANISATION"/>
+                  </xs:restriction>
+                </xs:simpleType>
+              </xs:element>
+              <xs:element name="ResCountry">
+                <xs:simpleType>
+                  <xs:restriction base="xs:string">
+                    <xs:pattern value="[A-Z]{2}"/>
+                  </xs:restriction>
+                </xs:simpleType>
+              </xs:element>
+              <xs:element name="TIN" type="xs:string" minOccurs="0"/>
+              <xs:element name="AccountNumber" type="xs:string"/>
+              <xs:element name="Balance" type="xs:decimal"/>
+              <xs:element name="Dividends" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="Interest" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="GrossProceeds" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="OtherIncome" type="xs:decimal" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="year" type="xs:gYear" use="required"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

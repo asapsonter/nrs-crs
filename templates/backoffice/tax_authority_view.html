@@ -1,0 +1,34 @@
+{% extends "backoffice/base.html" %}
+{% load flags %}
+{% block title %}Tax Authority View · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Tax Authority View</h1>
+<p class="page-sub">Read-only register of disseminated inbound records, matched to Nigerian taxpayers and risk-profiled for compliance review. This closes the incoming exchange loop.</p>
+
+{% if records %}
+<div class="risk-summary">
+  <div class="risk-tile risk-enhanced"><span class="value">{{ counts.enhanced }}</span><span class="label">Enhanced review</span></div>
+  <div class="risk-tile risk-specific"><span class="value">{{ counts.specific }}</span><span class="label">Specific review</span></div>
+  <div class="risk-tile risk-general"><span class="value">{{ counts.general }}</span><span class="label">General monitoring</span></div>
+</div>
+{% endif %}
+
+<table class="data">
+  <thead><tr><th>Review track</th><th>Matched taxpayer</th><th>NG TIN</th><th>From</th><th>DocRefID</th><th>Account</th><th>Balance</th></tr></thead>
+  <tbody>
+    {% for record in records %}
+    <tr>
+      <td><span class="risk risk-{{ record.risk_rating|lower }}">{{ record.get_risk_rating_display }}</span></td>
+      <td>{{ record.matched_taxpayer.name|default:record.holder_name }}</td>
+      <td class="mono">{{ record.ng_tin|default:"-" }}</td>
+      <td>{% country record.file.jurisdiction.code record.file.jurisdiction.name %}</td>
+      <td class="mono">{{ record.doc_ref_id }}</td>
+      <td class="mono">{{ record.account_number }}</td>
+      <td class="num">{{ record.balance }} {{ record.currency }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">No disseminated records yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

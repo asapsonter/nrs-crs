@@ -1,0 +1,41 @@
+{% extends "backoffice/base.html" %}
+{% load flags %}
+{% block title %}Corrections · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Correction queue</h1>
+<p class="page-sub">Record errors reported by partner jurisdictions. Each corrected record travels in a CRS702 message carrying a CorrDocRefID reference to the original DocRefID; deletions travel as OECD3.</p>
+
+{% for group in groups %}
+<div class="panel">
+  <h2 style="margin-top: 0;" class="mono">{{ group.package.message_ref_id }} <span class="muted" style="font-weight: 400;">to {{ group.package.jurisdiction.code|flag }}{{ group.package.jurisdiction.name }}</span></h2>
+  <form method="post" action="/backoffice/exchange/packages/{{ group.package.pk }}/correct/" class="stacked">
+    {% csrf_token %}
+    <table class="data">
+      <thead><tr><th>DocRefID</th><th>Error</th><th>Action</th><th>Corrected TIN</th><th>Corrected country</th><th>Corrected balance</th></tr></thead>
+      <tbody>
+        {% for error in group.errors %}
+        <tr>
+          <td class="mono">{{ error.doc_ref_id }}</td>
+          <td>{{ error.code }} {{ error.detail }}</td>
+          <td>
+            <select name="action_{{ error.pk }}">
+              <option value="correct">Correct (OECD2)</option>
+              <option value="delete">Delete (OECD3)</option>
+            </select>
+          </td>
+          <td><input type="text" name="tin_{{ error.pk }}" placeholder="TIN"></td>
+          <td><input type="text" name="country_{{ error.pk }}" maxlength="2" placeholder="e.g. GB"></td>
+          <td><input type="number" step="0.01" name="balance_{{ error.pk }}" placeholder="unchanged"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="actions-row">
+      {% if 'operate_exchange' in bo_caps %}<button type="submit" class="btn">Prepare CRS702 correction message</button>{% else %}<span class="muted">Read-only access.</span>{% endif %}
+    </div>
+  </form>
+</div>
+{% empty %}
+<p class="muted">No open correction items. Record errors reported by partners will appear here.</p>
+{% endfor %}
+{% endblock %}

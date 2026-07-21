@@ -1,0 +1,32 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Demo Email Outbox</title>
+<link rel="stylesheet" href="{% static 'css/portal.css' %}">
+</head>
+<body>
+<div class="pt-content">
+  <h1>Demo Email Outbox</h1>
+  <p class="page-sub">Outbound system email captured for demonstration. In production these messages would be delivered by the NRS mail infrastructure.</p>
+  <table class="data">
+    <thead><tr><th style="width: 160px;">Sent</th><th style="width: 220px;">To</th><th>Subject</th></tr></thead>
+    <tbody>
+      {% for email in emails %}
+      <tr>
+        <td>{{ email.sent_at|date:"Y-m-d H:i" }}</td>
+        <td>{{ email.to_address }}</td>
+        <td>
+          <strong>{{ email.subject }}</strong>
+          <pre style="white-space: pre-wrap; font-family: inherit; font-size: 12px; color: #6B7280; margin-top: 6px;">{{ email.body }}</pre>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3" class="muted">No email captured yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="back-nav"><a class="btn-back" href="/">Back to home page</a></div>
+</div>
+</body>
+</html>

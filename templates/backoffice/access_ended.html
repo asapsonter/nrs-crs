@@ -1,0 +1,19 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Access Ended</title>
+<link rel="stylesheet" href="{% static 'css/backoffice.css' %}">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-box">
+    <div class="org">Nigeria Revenue Service</div>
+    <div class="sys">AEOI-CRS Supervision Centre</div>
+    <div class="error-text">{{ reason }}</div>
+    <p class="muted mt">Issued credentials authenticate a single session within a fixed access window. Once the window closes the credential is consumed and cannot be used again.</p>
+    <p class="mt"><a class="btn" href="/backoffice/login/">Return to sign in</a></p>
+  </div>
+</div>
+</body>
+</html>

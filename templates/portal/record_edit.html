@@ -1,0 +1,55 @@
+{% extends "portal/base.html" %}
+{% load flags %}
+{% block title %}Amend Record · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<h1>{% if filing.status == 'RETURNED' %}Amend flagged record{% else %}Edit record{% endif %}</h1>
+<p class="page-sub">{{ filing.reference }} &middot; {{ record.doc_ref_id }}</p>
+
+{% if record_findings %}
+<div class="error-text">
+  {% for finding in record_findings %}
+  {{ finding.code }}: {{ finding.message }}<br>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if filing.status == 'RETURNED' %}
+<p class="muted">Saving this amendment creates a correction record (DocTypeIndic OECD2) with a CorrDocRefID reference to {{ record.doc_ref_id }}. The original record remains on the filing as superseded.</p>
+{% endif %}
+
+<form method="post" class="stacked">
+  {% csrf_token %}
+  <label for="holder_name">Account holder name</label>
+  <input type="text" name="holder_name" id="holder_name" value="{{ record.holder_name }}" required>
+  <label for="holder_type">Holder type</label>
+  <select name="holder_type" id="holder_type">
+    <option value="INDIVIDUAL" {% if record.holder_type == 'INDIVIDUAL' %}selected{% endif %}>Individual</option>
+    <option value="ORGANISATION" {% if record.holder_type == 'ORGANISATION' %}selected{% endif %}>Organisation</option>
+  </select>
+  <label for="residence_country">Residence jurisdiction</label>
+  <select name="residence_country" id="residence_country" class="flag-select" required>
+    <option value="">Select jurisdiction</option>
+    {% for j in jurisdictions %}
+    <option value="{{ j.code }}" {% if record.residence_country == j.code %}selected{% endif %}>{{ j.code|flag_glyph }}  {{ j.name }} ({{ j.code }})</option>
+    {% endfor %}
+  </select>
+  <label for="foreign_tin">TIN issued by residence jurisdiction</label>
+  <input type="text" name="foreign_tin" id="foreign_tin" value="{{ record.foreign_tin }}">
+  <label for="account_number">Account number</label>
+  <input type="text" name="account_number" id="account_number" value="{{ record.account_number }}" required>
+  <label for="balance">Account balance (NGN)</label>
+  <input type="number" name="balance" id="balance" step="0.01" value="{{ record.balance }}">
+  <label for="dividends">Dividends (NGN)</label>
+  <input type="number" name="dividends" id="dividends" step="0.01" value="{{ record.dividends }}">
+  <label for="interest">Interest (NGN)</label>
+  <input type="number" name="interest" id="interest" step="0.01" value="{{ record.interest }}">
+  <label for="gross_proceeds">Gross proceeds (NGN)</label>
+  <input type="number" name="gross_proceeds" id="gross_proceeds" step="0.01" value="{{ record.gross_proceeds }}">
+  <label for="other_income">Other income (NGN)</label>
+  <input type="number" name="other_income" id="other_income" step="0.01" value="{{ record.other_income }}">
+  <div class="actions-row">
+    <button type="submit" class="btn">{% if filing.status == 'RETURNED' %}Save amendment{% else %}Save{% endif %}</button>
+    <a class="btn secondary" href="/portal/filings/{{ filing.pk }}/">Cancel</a>
+  </div>
+</form>
+{% endblock %}

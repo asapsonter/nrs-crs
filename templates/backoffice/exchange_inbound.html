@@ -1,0 +1,26 @@
+{% extends "backoffice/base.html" %}
+{% load pills flags %}
+{% block title %}Inbound Files · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Inbound files</h1>
+<p class="page-sub">CRS data files received from partner jurisdictions, processed in two stages: file level, then record level.</p>
+
+<table class="data">
+  <thead><tr><th>MessageRefID</th><th>From</th><th>Year</th><th>Records</th><th>Status</th><th>Received</th><th></th></tr></thead>
+  <tbody>
+    {% for file in files %}
+    <tr>
+      <td class="mono">{{ file.message_ref_id }}</td>
+      <td>{% country file.jurisdiction.code file.jurisdiction.name %}</td>
+      <td>{{ file.reporting_year }}</td>
+      <td class="num">{{ file.records.count }}</td>
+      <td>{% pill file.status file.get_status_display %}</td>
+      <td>{{ file.received_at|date:"Y-m-d H:i" }}</td>
+      <td><a href="/backoffice/exchange/inbound/{{ file.pk }}/">Open</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">No inbound files.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
