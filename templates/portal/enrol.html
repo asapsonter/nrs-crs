@@ -15,28 +15,14 @@
 <form method="post" enctype="multipart/form-data" class="stacked" id="enrol-form">
   {% csrf_token %}
 
-  <h2 class="enrol-types-title">Select an enrolment type to begin</h2>
+  <h2 class="enrol-types-title">Enrolment type</h2>
   <div class="enrol-types" role="radiogroup" aria-label="Enrolment type">
     <label class="enrol-type-card">
-      <input type="radio" name="enrolment_type" value="FINANCIAL_ENTITY" {% if values.enrolment_type == 'FINANCIAL_ENTITY' %}checked{% endif %} required>
+      <input type="radio" name="enrolment_type" value="FINANCIAL_ENTITY" checked required>
       <span class="etc-mark" aria-hidden="true">&#10003;</span>
       <span class="etc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/><path d="M9 21v-5h6v5"/><path d="M9 11h.01M15 11h.01"/></svg></span>
       <span class="etc-title">Financial Entities</span>
       <span class="etc-desc">Banks, insurers, funds, and other reporting financial institutions.</span>
-    </label>
-    <label class="enrol-type-card">
-      <input type="radio" name="enrolment_type" value="STAKEHOLDER" {% if values.enrolment_type == 'STAKEHOLDER' %}checked{% endif %}>
-      <span class="etc-mark" aria-hidden="true">&#10003;</span>
-      <span class="etc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.1"/><path d="M2.6 20a6.4 6.4 0 0 1 12.8 0"/><path d="M16 5.3a3.1 3.1 0 0 1 0 6.2"/><path d="M21.4 20a6.4 6.4 0 0 0-4-6"/></svg></span>
-      <span class="etc-title">Financial Entity Stakeholders</span>
-      <span class="etc-desc">Controlling persons and beneficial owners of a reporting entity.</span>
-    </label>
-    <label class="enrol-type-card">
-      <input type="radio" name="enrolment_type" value="INDIVIDUAL" {% if values.enrolment_type == 'INDIVIDUAL' %}checked{% endif %}>
-      <span class="etc-mark" aria-hidden="true">&#10003;</span>
-      <span class="etc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
-      <span class="etc-title">Individuals</span>
-      <span class="etc-desc">Individual account holders enrolling in their own capacity.</span>
     </label>
   </div>
 
@@ -147,9 +133,15 @@
           <input type="text" name="pu_first_name" id="pu_first_name" value="{{ values.pu_first_name|default:'' }}" required>
         </div>
       </div>
-      <div class="field">
-        <label for="pu_designation">Position</label>
-        <input type="text" name="pu_designation" id="pu_designation" value="{{ values.pu_designation|default:'' }}" required>
+      <div class="fset-grid">
+        <div class="field">
+          <label for="pu_dob">Date of birth</label>
+          <input type="date" name="pu_dob" id="pu_dob" value="{{ values.pu_dob|default:'' }}" required>
+        </div>
+        <div class="field">
+          <label for="pu_designation">Position</label>
+          <input type="text" name="pu_designation" id="pu_designation" value="{{ values.pu_designation|default:'' }}" required>
+        </div>
       </div>
       <div class="fset-grid">
         <div class="field">

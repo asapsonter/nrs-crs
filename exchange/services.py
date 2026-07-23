@@ -110,22 +110,45 @@ def build_packages(year: int, message_type: str = "CRS701") -> list:
     return packages
 
 
+def _address_block(indent: str, country: str, address_free: str, lines: list) -> None:
+    """Emit a CRS Address element (CountryCode plus a free-form address)."""
+    add = lines.append
+    add(f"{indent}<crs:Address>")
+    add(f"{indent}  <cfc:CountryCode>{country}</cfc:CountryCode>")
+    add(f"{indent}  <cfc:AddressFree>{escape(address_free or 'Address not provided')}</cfc:AddressFree>")
+    add(f"{indent}</crs:Address>")
+
+
+def _birth_block(indent: str, birth_date, birth_city: str, lines: list) -> None:
+    """Emit a CRS BirthInfo element when a date of birth is held."""
+    if not birth_date:
+        return
+    add = lines.append
+    add(f"{indent}<crs:BirthInfo>")
+    add(f"{indent}  <crs:BirthDate>{birth_date:%Y-%m-%d}</crs:BirthDate>")
+    if birth_city:
+        add(f"{indent}  <crs:City>{escape(birth_city)}</crs:City>")
+    add(f"{indent}</crs:BirthInfo>")
+
+
 def generate_crs_xml(package) -> str:
     """Render the CRS OECD XML body for a package.
 
-    Simplified but structurally faithful to the CRS XML Schema v2.0: one
-    MessageSpec, then per reporting FI a ReportingFI element with its
-    AccountReport blocks. Correction records carry CorrDocRefID and their
-    DocTypeIndic (OECD2 or OECD3)."""
+    Structurally faithful to the CRS XML Schema v2.0: one MessageSpec, then per
+    reporting FI a ReportingFI element with its AccountReport blocks. Each
+    AccountHolder carries a mandatory Address; individuals carry BirthInfo,
+    entities carry an AcctHolderType, and Passive NFEs carry ControllingPerson
+    blocks. Correction records carry CorrDocRefID and their DocTypeIndic."""
     lines: list[str] = []
     add = lines.append
     add('<?xml version="1.0" encoding="UTF-8"?>')
     add('<crs:CRS_OECD version="2.0" xmlns:crs="urn:oecd:ties:crs:v2" xmlns:cfc="urn:oecd:ties:commontypesfatcacrs:v2">')
     add("  <crs:MessageSpec>")
-    add(f"    <crs:SendingCompanyIN>NRS-NG</crs:SendingCompanyIN>")
+    add(f"    <crs:SendingCompanyIN>{escape(config.NRS_SENDING_COMPANY_IN)}</crs:SendingCompanyIN>")
     add(f"    <crs:TransmittingCountry>{config.SENDING_JURISDICTION}</crs:TransmittingCountry>")
     add(f"    <crs:ReceivingCountry>{package.jurisdiction.code}</crs:ReceivingCountry>")
     add("    <crs:MessageType>CRS</crs:MessageType>")
+    add(f"    <crs:Contact>{escape(config.NRS_CONTACT)}</crs:Contact>")
     add(f"    <crs:MessageRefId>{package.message_ref_id}</crs:MessageRefId>")
     message_type_indic = "CRS701" if package.message_type == "CRS701" else "CRS702"
     add(f"    <crs:MessageTypeIndic>{message_type_indic}</crs:MessageTypeIndic>")
@@ -135,18 +158,25 @@ def generate_crs_xml(package) -> str:
 
     by_rfi: dict[int, list] = {}
     rfis: dict[int, ReportingFI] = {}
+    fi_filing: dict[int, object] = {}
     for record in package.records.select_related("filing__rfi").order_by("doc_ref_id"):
         rfi = record.filing.rfi
         by_rfi.setdefault(rfi.pk, []).append(record)
         rfis[rfi.pk] = rfi
+        fi_filing.setdefault(rfi.pk, record.filing)
 
     for rfi_pk, records in by_rfi.items():
         rfi = rfis[rfi_pk]
+        filing = fi_filing[rfi_pk]
+        # The RFI's own Sending Company IN captured on the filing (falls back to
+        # the RFI TIN) is carried at ReportingFI level.
+        fi_in = (filing.sending_company_in or rfi.tin).strip() or rfi.tin
         add("  <crs:CrsBody>")
         add("    <crs:ReportingFI>")
         add(f"      <crs:ResCountryCode>{config.SENDING_JURISDICTION}</crs:ResCountryCode>")
-        add(f'      <crs:IN issuedBy="NG">{escape(rfi.tin)}</crs:IN>')
+        add(f'      <crs:IN issuedBy="NG">{escape(fi_in)}</crs:IN>')
         add(f"      <crs:Name>{escape(rfi.legal_name)}</crs:Name>")
+        _address_block("      ", config.SENDING_JURISDICTION, rfi.full_address, lines)
         add("      <crs:DocSpec>")
         add("        <crs:DocTypeIndic>OECD1</crs:DocTypeIndic>")
         add(f"        <crs:DocRefId>NG{package.reporting_year}-{rfi.reference}-FI</crs:DocRefId>")
@@ -161,7 +191,8 @@ def generate_crs_xml(package) -> str:
             if record.corr_doc_ref_id:
                 add(f"          <crs:CorrDocRefId>{record.corr_doc_ref_id}</crs:CorrDocRefId>")
             add("        </crs:DocSpec>")
-            add(f"        <crs:AccountNumber>{escape(record.account_number)}</crs:AccountNumber>")
+            undoc = ' UndocumentedAccount="true"' if record.is_undocumented else ""
+            add(f'        <crs:AccountNumber{undoc}>{escape(record.account_number)}</crs:AccountNumber>')
             add("        <crs:AccountHolder>")
             if record.holder_type == "INDIVIDUAL":
                 add("          <crs:Individual>")
@@ -169,15 +200,34 @@ def generate_crs_xml(package) -> str:
                 if record.foreign_tin:
                     add(f'            <crs:TIN issuedBy="{record.residence_country}">{escape(record.foreign_tin)}</crs:TIN>')
                 add(f"            <crs:Name><crs:FullName>{escape(record.holder_name)}</crs:FullName></crs:Name>")
+                _address_block("            ", record.address_country_code, record.holder_address, lines)
+                _birth_block("            ", record.birth_date, record.birth_city, lines)
                 add("          </crs:Individual>")
             else:
-                add("          <crs:Organisation>")
+                holder_type_attr = f' crsAcctHolderType="{record.acct_holder_type}"' if record.acct_holder_type else ""
+                add(f"          <crs:Organisation{holder_type_attr}>")
                 add(f"            <crs:ResCountryCode>{record.residence_country}</crs:ResCountryCode>")
                 if record.foreign_tin:
                     add(f'            <crs:IN issuedBy="{record.residence_country}">{escape(record.foreign_tin)}</crs:IN>')
                 add(f"            <crs:Name>{escape(record.holder_name)}</crs:Name>")
+                _address_block("            ", record.address_country_code, record.holder_address, lines)
                 add("          </crs:Organisation>")
             add("        </crs:AccountHolder>")
+
+            # Controlling persons for Passive NFEs.
+            for cp in record.controlling_persons.all():
+                add("        <crs:ControllingPerson>")
+                add("          <crs:Individual>")
+                add(f"            <crs:ResCountryCode>{cp.residence_country}</crs:ResCountryCode>")
+                if cp.tin:
+                    add(f'            <crs:TIN issuedBy="{cp.residence_country}">{escape(cp.tin)}</crs:TIN>')
+                add(f"            <crs:Name><crs:FullName>{escape(cp.name)}</crs:FullName></crs:Name>")
+                _address_block("            ", cp.residence_country, cp.address, lines)
+                _birth_block("            ", cp.birth_date, "", lines)
+                add("          </crs:Individual>")
+                add(f"          <crs:CtrlgPersonType>{cp.ctrlg_person_type}</crs:CtrlgPersonType>")
+                add("        </crs:ControllingPerson>")
+
             add(f'        <crs:AccountBalance currCode="{record.currency}">{record.balance}</crs:AccountBalance>')
             for element, value in (
                 ("CRS501", record.dividends),

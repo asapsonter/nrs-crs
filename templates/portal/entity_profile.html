@@ -3,7 +3,7 @@
 {% block title %}Reporting Entity Profile · NRS AEOI-CRS Portal{% endblock %}
 {% block content %}
 <h1>Reporting Entity Profile</h1>
-<p class="page-sub">The enrolment record for {{ rfi.legal_name }}. To change any of these details, contact the NRS AEOI-CRS unit.</p>
+<p class="page-sub">The enrolment record for {{ rfi.legal_name }}. Identity details are fixed at enrolment; you may update the institution's own contact details.</p>
 
 <div class="detail-panels">
   <section class="panel">
@@ -18,19 +18,65 @@
     </dl>
   </section>
 
+  {% if edit %}
   <section class="panel">
-    <h2>Contact</h2>
+    <h2>Contact details</h2>
+    <form method="post" action="/portal/profile/" class="stacked" style="max-width: 520px;">
+      {% csrf_token %}
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" name="email" id="email" value="{{ rfi.email }}">
+      </div>
+      <div class="field">
+        <label for="phone">Telephone</label>
+        <div class="phone-group">
+          <input type="text" name="phone_cc" id="phone_cc" value="{{ rfi.phone_cc }}" aria-label="Country code" style="max-width: 90px;">
+          <input type="text" name="phone" id="phone" value="{{ rfi.phone }}" placeholder="Number">
+        </div>
+      </div>
+      <div class="field">
+        <label for="street">Street</label>
+        <input type="text" name="street" id="street" value="{{ rfi.street }}">
+      </div>
+      <div class="fset-grid">
+        <div class="field">
+          <label for="city">City or town</label>
+          <input type="text" name="city" id="city" value="{{ rfi.city }}">
+        </div>
+        <div class="field">
+          <label for="state_province">State or province</label>
+          <input type="text" name="state_province" id="state_province" value="{{ rfi.state_province }}">
+        </div>
+      </div>
+      <div class="field">
+        <label for="post_code">Post code</label>
+        <input type="text" name="post_code" id="post_code" value="{{ rfi.post_code }}" style="max-width: 200px;">
+      </div>
+      <div class="actions-row">
+        <button type="submit" class="btn">Save contact details</button>
+        <a class="btn secondary" href="/portal/profile/">Cancel</a>
+      </div>
+    </form>
+  </section>
+  {% else %}
+  <section class="panel">
+    <div class="panel-head">
+      <h2 style="margin: 0;">Contact</h2>
+      <a class="btn secondary btn-sm" href="/portal/profile/?edit=1">Edit contact details</a>
+    </div>
     <dl class="kv">
       <dt>Email</dt><dd>{{ rfi.email|default:"-" }}</dd>
       <dt>Phone</dt><dd>{{ rfi.full_phone|default:"-" }}</dd>
       <dt>Registered address</dt><dd>{{ rfi.full_address|default:"-" }}</dd>
     </dl>
   </section>
+  {% endif %}
 
   <section class="panel">
     <h2>Primary User</h2>
     <dl class="kv">
       <dt>Name</dt><dd>{{ rfi.pu_name|default:"-" }}</dd>
+      <dt>Date of birth</dt><dd>{% if rfi.pu_dob %}{{ rfi.pu_dob|date:"j M Y" }}{% else %}-{% endif %}</dd>
       <dt>Position</dt><dd>{{ rfi.pu_designation|default:"-" }}</dd>
       <dt>Email</dt><dd>{{ rfi.pu_email }}</dd>
       <dt>Phone</dt><dd>{{ rfi.pu_full_phone|default:"-" }}</dd>

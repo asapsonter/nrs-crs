@@ -1,0 +1,152 @@
+{% extends "portal/base.html" %}
+{% load flags %}
+{% block title %}{{ filing.name|default:filing.reference }} · CRS Filing · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<h1>{{ filing.name|default:filing.reference }}</h1>
+<p class="page-sub">CRS Filing &middot; {{ filing.reference }} &middot; {% if filing.is_crs_data %}{{ filing.message_type }}{% else %}{{ filing.get_kind_display }}{% endif %}</p>
+
+{% if errors %}
+<div class="error-text">
+  {% for error in errors %}{{ error }}<br>{% endfor %}
+</div>
+{% endif %}
+
+<div class="filing-meta">
+  <div class="fm-item"><span class="fm-k">Reporting Entity</span><span class="fm-v">{{ filing.rfi.legal_name }}</span></div>
+  <div class="fm-item"><span class="fm-k">Period end date</span><span class="fm-v">{% if filing.period_end_date %}{{ filing.period_end_date|date:"j M Y" }}{% else %}-{% endif %}</span></div>
+</div>
+
+<form method="post" action="/portal/filings/{{ filing.pk }}/crs/" class="stacked" id="crs-form">
+  {% csrf_token %}
+  {% if read_only %}
+  <div class="flash">Viewing General Information in read only mode. Choose Edit to make changes.</div>
+  {% else %}
+  <p class="req-note">Fields marked <span class="req-star">*</span> are required to validate.</p>
+  {% endif %}
+
+  <section class="fset">
+    <div class="fset-head">
+      <span class="fset-num">1</span>
+      <div class="fset-heading">
+        <h2 class="fset-title">General Information</h2>
+        <p class="fset-hint">The CRS message header identifying where this filing is sent and how it is referenced.</p>
+      </div>
+    </div>
+    <div class="fset-body">
+      <div class="fset-grid">
+        <div class="field">
+          <label for="receiving_country" class="req">Receiving Country</label>
+          <select name="receiving_country" id="receiving_country" class="flag-select" {% if read_only %}disabled{% endif %}>
+            <option value="">Select receiving country</option>
+            {% for j in jurisdictions %}
+            <option value="{{ j.code }}" {% if filing.receiving_country == j.code %}selected{% endif %}>{{ j.code|flag_glyph }}  {{ j.name }} ({{ j.code }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="sending_company_in" class="req">Sending Company IN</label>
+          <input type="text" name="sending_company_in" id="sending_company_in"
+                 value="{{ filing.sending_company_in|default:filing.rfi.tin }}" {% if read_only %}readonly{% endif %}>
+        </div>
+      </div>
+      <div class="fset-grid">
+        <div class="field">
+          <label for="message_type">Message Type</label>
+          <select name="message_type" id="message_type" {% if read_only %}disabled{% endif %}>
+            {% for value, label in message_types %}
+            <option value="{{ value }}" {% if filing.message_type == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="message_reference" class="req">Message Reference</label>
+          <input type="text" name="message_reference" id="message_reference"
+                 value="{{ filing.message_reference }}" placeholder="For example, NG2024-{{ filing.reference }}" {% if read_only %}readonly{% endif %}>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="enrol-actions">
+    {% if read_only %}
+    <p class="enrol-actions-note">This form is shown read only.</p>
+    <div class="actions-row" style="margin: 0;">
+      <a class="btn" href="/portal/filings/{{ filing.pk }}/crs/">Edit</a>
+      <a class="btn secondary" href="/portal/filings/{{ filing.pk }}/view/">Back to filing</a>
+    </div>
+    {% else %}
+    <p class="enrol-actions-note">Save as draft keeps your progress. Validate &amp; Save checks the message header before continuing to the filing.</p>
+    <div class="actions-row" style="margin: 0;">
+      <button type="submit" name="action" value="save" class="btn secondary">Save as draft</button>
+      <button type="submit" name="action" value="validate" class="btn">Validate &amp; Save</button>
+    </div>
+    {% endif %}
+  </div>
+</form>
+
+<div class="back-nav"><a class="btn-back" href="/portal/filings/drafts/">Back to draft filings</a></div>
+
+<div class="val-overlay" id="validate-overlay" role="status" aria-live="polite" aria-hidden="true">
+  <div class="val-card">
+    <div class="val-spinner" aria-hidden="true"></div>
+    <h2 class="val-title">Validating filing</h2>
+    <p class="val-sub">Checking the CRS message header against the schema.</p>
+    <ul class="val-steps">
+      <li class="val-step" data-step="0"><span class="val-dot"></span>Reading message header</li>
+      <li class="val-step" data-step="1"><span class="val-dot"></span>Verifying receiving jurisdiction</li>
+      <li class="val-step" data-step="2"><span class="val-dot"></span>Checking Sending Company IN</li>
+      <li class="val-step" data-step="3"><span class="val-dot"></span>Validating message reference</li>
+      <li class="val-step" data-step="4"><span class="val-dot"></span>Finalising submission</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Validate and Save plays a short validation sequence, then submits the form
+   so the server performs the real validation and redirect. Save as draft
+   submits immediately. */
+(function () {
+  var form = document.getElementById("crs-form");
+  var overlay = document.getElementById("validate-overlay");
+  if (!form || !overlay) return;
+  var steps = Array.prototype.slice.call(overlay.querySelectorAll(".val-step"));
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var proceeding = false;
+
+  form.addEventListener("submit", function (event) {
+    if (proceeding) return;                       // second pass: let it submit
+    var submitter = event.submitter;
+    if (!submitter || submitter.value !== "validate") return;  // draft: normal
+    event.preventDefault();
+
+    overlay.classList.add("showing");     // put it in the layout
+    overlay.setAttribute("aria-hidden", "false");
+    // Force a reflow so the opacity transition runs from hidden to shown.
+    void overlay.offsetWidth;
+    overlay.classList.add("show");         // fade it in
+
+    function finish() {
+      proceeding = true;
+      if (form.requestSubmit) form.requestSubmit(submitter);
+      else { submitter.click(); }
+    }
+
+    if (reduce) { window.setTimeout(finish, 300); return; }
+
+    var perStep = 420;
+    steps.forEach(function (step, index) {
+      window.setTimeout(function () {
+        step.classList.add("active");
+        window.setTimeout(function () {
+          step.classList.remove("active");
+          step.classList.add("done");
+        }, perStep - 120);
+      }, index * perStep);
+    });
+    window.setTimeout(finish, steps.length * perStep + 260);
+  });
+})();
+</script>
+{% endblock %}

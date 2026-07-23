@@ -15,6 +15,7 @@
     <dt>Institution email</dt><dd>{{ rfi.email|default:"Not provided" }}</dd>
     <dt>Institution telephone</dt><dd>{{ rfi.full_phone|default:"Not provided" }}</dd>
     <dt>Primary User</dt><dd>{{ rfi.pu_surname }}, {{ rfi.pu_first_name }} &middot; {{ rfi.pu_designation }}</dd>
+    <dt>PU date of birth</dt><dd>{% if rfi.pu_dob %}{{ rfi.pu_dob|date:"j M Y" }}{% else %}Not provided{% endif %}</dd>
     <dt>PU email</dt><dd>{{ rfi.pu_email }}</dd>
     <dt>PU telephone</dt><dd>{{ rfi.pu_full_phone }}</dd>
     <dt>PU identification</dt><dd>{% if rfi.id_document %}<a href="{{ rfi.id_document.url }}">{{ rfi.id_document.name }}</a>{% else %}Not on file{% endif %}</dd>

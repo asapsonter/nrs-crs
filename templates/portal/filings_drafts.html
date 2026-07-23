@@ -1,5 +1,5 @@
 {% extends "portal/base.html" %}
-{% load pills %}
+{% load pills flags %}
 {% block title %}Draft Filings · NRS AEOI-CRS Portal{% endblock %}
 {% block content %}
 {% include "portal/deadline_banner.html" %}
@@ -13,22 +13,28 @@
   </div>
 </div>
 
+<div class="table-wrap">
 <table class="data">
-  <thead><tr><th>Reference</th><th>Year</th><th>Type</th><th>Records</th><th>Status</th><th>Created</th><th></th></tr></thead>
+  <thead><tr>
+    <th>Filing Name</th><th>Reference</th><th>Revision</th><th>Category</th>
+    <th>Receiving Country</th><th>Status</th><th>Filing Date</th><th>Due Date</th>
+  </tr></thead>
   <tbody>
     {% for filing in filings %}
     <tr>
+      <td><a href="/portal/filings/{{ filing.pk }}/crs/">{{ filing.name|default:filing.get_kind_display }}</a></td>
       <td class="mono">{{ filing.reference }}</td>
-      <td>{{ filing.reporting_year }}</td>
-      <td>{{ filing.get_kind_display }} ({{ filing.message_type }})</td>
-      <td class="num">{{ filing.record_count }}</td>
-      <td>{% pill filing.status filing.get_status_display %}</td>
+      <td class="num">{{ filing.revision }}</td>
+      <td><span class="tag-cat">{{ filing.category_label }}</span></td>
+      <td>{% if filing.receiving_country %}{{ filing.receiving_country|flag }}{{ filing.receiving_country }}{% else %}<span class="muted">-</span>{% endif %}</td>
+      <td><span class="tag-data {% if filing.data_status == 'No Data' %}nodata{% endif %}">{{ filing.data_status }}</span></td>
       <td>{{ filing.created_at|date:"Y-m-d" }}</td>
-      <td><a href="/portal/filings/{{ filing.pk }}/">Open</a></td>
+      <td>{% if deadline_date %}{{ deadline_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
     </tr>
     {% empty %}
-    <tr><td colspan="7" class="muted">No draft filings. Start one under Submissions.</td></tr>
+    <tr><td colspan="8" class="muted">No draft filings. Start one under Submissions.</td></tr>
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endblock %}

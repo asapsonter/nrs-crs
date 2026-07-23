@@ -1,0 +1,198 @@
+{% extends "portal/base.html" %}
+{% block title %}View Filing · {{ filing.name|default:filing.reference }} · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<h1>View Filing</h1>
+<p class="page-sub">Please select a form to view. This is the structure of {{ filing.reference }} as it will be submitted to the NRS.</p>
+
+<div class="vf-toolbar">
+  <span class="vf-actions-label">Actions</span>
+  <div class="vf-toolbar-btns">
+    <button type="button" class="btn ghost vf-comments" id="vf-comments-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg>
+      View comments
+    </button>
+    <a class="btn secondary" href="/portal/filings/{{ filing.pk }}/">Open filing</a>
+  </div>
+</div>
+
+<div class="vf-comments-panel" id="vf-comments-panel" hidden>
+  <strong>Comments</strong>
+  {% if filing.checker_comment %}
+  <p>{{ filing.checker_comment }}</p>
+  {% elif filing.return_reason %}
+  <p>{{ filing.return_reason }}</p>
+  {% else %}
+  <p class="muted">No comments have been recorded on this filing.</p>
+  {% endif %}
+</div>
+
+{# Legend / Key: the structural node types and status markers used in the tree. #}
+<div class="vf-legend" aria-label="Key">
+  <span class="vf-legend-title">Key</span>
+  <span class="vf-legend-item"><span class="vf-ic type-formset">{% include "portal/_vf_icons.html" with i="formset" %}</span>Form Set</span>
+  <span class="vf-legend-item"><span class="vf-ic type-folder">{% include "portal/_vf_icons.html" with i="folder" %}</span>Folder</span>
+  <span class="vf-legend-item"><span class="vf-ic type-repeat">{% include "portal/_vf_icons.html" with i="repeat" %}</span>Repeatable Folder</span>
+  <span class="vf-legend-item"><span class="vf-ic type-form">{% include "portal/_vf_icons.html" with i="form" %}</span>Form</span>
+  <span class="vf-legend-item"><span class="vf-ic type-add">{% include "portal/_vf_icons.html" with i="add" %}</span>Add section</span>
+  <span class="vf-legend-sep" aria-hidden="true"></span>
+  <span class="vf-legend-item"><span class="vf-status validated">Validated</span></span>
+  <span class="vf-legend-item"><span class="vf-status draft">In Draft</span></span>
+  <span class="vf-legend-item"><span class="vf-status nodata">No Data</span></span>
+  <span class="vf-legend-item"><span class="vf-status mandatory">Mandatory</span></span>
+</div>
+
+{# Filing header: the name and overall status. #}
+<div class="vf-filing-head">
+  <div class="vf-filing-name">
+    <span class="vf-ic type-formset">{% include "portal/_vf_icons.html" with i="formset" %}</span>
+    {{ filing.name|default:filing.get_kind_display }}
+  </div>
+  <span class="vf-status draft big">{% if filing.status == 'DRAFT' %}In Draft{% else %}{{ filing.get_status_display }}{% endif %}</span>
+</div>
+
+{# The CRS message structure as a folder tree. Actions operate on the real
+   filing: General Information opens the CRS header form, account records can
+   be added, edited, and deleted, and the report can be cleared. #}
+<div class="vf-tree-card">
+<ul class="vf-tree">
+  <li class="vf-node">
+    <div class="vf-row">
+      <span class="vf-ic type-formset">{% include "portal/_vf_icons.html" with i="formset" %}</span>
+      <span class="vf-title">{{ filing.get_kind_display }}</span>
+      <span class="vf-status draft">{% if filing.status == 'DRAFT' %}In Draft{% else %}{{ filing.get_status_display }}{% endif %}</span>
+    </div>
+
+    <ul>
+      <li class="vf-node">
+        <div class="vf-row">
+          <span class="vf-code gi">GI</span>
+          <span class="vf-ic type-form">{% include "portal/_vf_icons.html" with i="form" %}</span>
+          <span class="vf-title">General Information</span>
+          {% if header_done %}<span class="vf-status validated">Validated</span>{% else %}<span class="vf-status draft">In Draft</span>{% endif %}
+          <span class="vf-badge-mand">Mandatory</span>
+          <span class="vf-actions">
+            {% if can_edit %}
+            <form method="post" action="/portal/filings/{{ filing.pk }}/crs/" onsubmit="return confirm('Clear General Information? The receiving country, Sending Company IN and message reference will be removed.');">
+              {% csrf_token %}<input type="hidden" name="action" value="clear">
+              <button type="submit" class="vf-act">Clear</button>
+            </form>
+            <a class="vf-act" href="/portal/filings/{{ filing.pk }}/crs/">Edit</a>
+            {% endif %}
+            <a class="vf-act" href="/portal/filings/{{ filing.pk }}/crs/?mode=view">View</a>
+          </span>
+        </div>
+      </li>
+
+      <li class="vf-node">
+        <div class="vf-row">
+          <span class="vf-code crs">CRS</span>
+          <span class="vf-ic type-repeat">{% include "portal/_vf_icons.html" with i="repeat" %}</span>
+          <span class="vf-title">CRS Report</span>
+          {% if record_count %}<span class="vf-status validated">Validated</span>{% else %}<span class="vf-status nodata">No Data</span>{% endif %}
+          <span class="vf-actions">
+            {% if can_edit %}
+            <a class="vf-act add" href="/portal/filings/{{ filing.pk }}/#add-record">Add</a>
+            {% if record_count %}
+            <form method="post" action="/portal/filings/{{ filing.pk }}/records/clear/" onsubmit="return confirm('Delete all {{ record_count }} account record{{ record_count|pluralize }} from this report?');">
+              {% csrf_token %}
+              <button type="submit" class="vf-act danger">Delete All</button>
+            </form>
+            {% endif %}
+            {% endif %}
+          </span>
+        </div>
+
+        <ul>
+          <li class="vf-node">
+            <div class="vf-row">
+              <span class="vf-ic type-folder">{% include "portal/_vf_icons.html" with i="folder" %}</span>
+              <span class="vf-title">CRS Report</span>
+              <span class="vf-count">{{ record_count }}</span>
+              <span class="vf-actions">
+                {% if can_edit %}
+                <form method="post" action="/portal/filings/{{ filing.pk }}/records/clear/" onsubmit="return confirm('Delete this CRS Report and its {{ record_count }} account record{{ record_count|pluralize }}?');">
+                  {% csrf_token %}
+                  <button type="submit" class="vf-act danger">Delete</button>
+                </form>
+                {% endif %}
+              </span>
+            </div>
+
+            <ul>
+              <li class="vf-node">
+                <div class="vf-row">
+                  <span class="vf-code rfi">RFI</span>
+                  <span class="vf-ic type-form">{% include "portal/_vf_icons.html" with i="form" %}</span>
+                  <span class="vf-title">Reporting FI Information</span>
+                  <span class="vf-status validated">Validated</span>
+                  <span class="vf-badge-mand">Mandatory</span>
+                  <span class="vf-actions">
+                    <a class="vf-act" href="/portal/profile/?edit=1">Edit</a>
+                    <a class="vf-act" href="/portal/profile/">View</a>
+                  </span>
+                </div>
+              </li>
+              <li class="vf-node">
+                <div class="vf-row">
+                  <span class="vf-code ai">AI</span>
+                  <span class="vf-ic type-add">{% include "portal/_vf_icons.html" with i="add" %}</span>
+                  <span class="vf-title">Account Information</span>
+                  {% if record_count %}<span class="vf-status validated">{{ record_count }} record{{ record_count|pluralize }}</span>{% else %}<span class="vf-status nodata">No Data</span>{% endif %}
+                  <span class="vf-actions">
+                    {% if can_edit %}
+                    <a class="vf-act add" href="/portal/filings/{{ filing.pk }}/#add-record">Add</a>
+                    {% endif %}
+                  </span>
+                </div>
+
+                {% if records %}
+                <ul>
+                  {% for r in records %}
+                  <li class="vf-node">
+                    <div class="vf-row">
+                      <span class="vf-ic type-form">{% include "portal/_vf_icons.html" with i="form" %}</span>
+                      <span class="vf-title">{{ r.holder_name }}</span>
+                      <span class="vf-rec-meta">{{ r.residence_country }} &middot; {{ r.account_number }}</span>
+                      <span class="vf-actions">
+                        {% if can_edit %}
+                        <a class="vf-act" href="/portal/filings/{{ filing.pk }}/records/{{ r.pk }}/">Edit</a>
+                        <form method="post" action="/portal/filings/{{ filing.pk }}/records/{{ r.pk }}/delete/" onsubmit="return confirm('Delete account record for {{ r.holder_name|escapejs }}?');">
+                          {% csrf_token %}
+                          <button type="submit" class="vf-act danger">Delete</button>
+                        </form>
+                        {% else %}
+                        <span class="vf-rec-meta">{{ r.balance }} {{ r.currency }}</span>
+                        {% endif %}
+                      </span>
+                    </div>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+</ul>
+</div>
+
+<div class="back-nav"><a class="btn-back" href="/portal/filings/drafts/">Back to draft filings</a></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var btn = document.getElementById("vf-comments-btn");
+  var panel = document.getElementById("vf-comments-panel");
+  if (btn && panel) {
+    btn.addEventListener("click", function () {
+      panel.hidden = !panel.hidden;
+      btn.classList.toggle("is-on", !panel.hidden);
+    });
+  }
+})();
+</script>
+{% endblock %}

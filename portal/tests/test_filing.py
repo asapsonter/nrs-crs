@@ -61,6 +61,8 @@ def make_record(filing: Filing, **kwargs) -> AccountReport:
         holder_name="Chukwu Emeka",
         residence_country="GB",
         foreign_tin="QQ123456C",
+        holder_address="1 King Street, London",
+        self_certification="OBTAINED",
         account_number=f"ACC-{AccountReport.objects.count() + 1:04d}",
         balance=Decimal("1000000.00"),
     )
@@ -93,12 +95,36 @@ class TestValidationRules:
         run_validation(filing)
         assert filing.findings.filter(code="R-104").exists()
 
-    def test_missing_tin_is_warning_not_error(self, rfi, partners):
+    def test_missing_tin_without_reason_is_error(self, rfi, partners):
+        # CRS 2.0: a missing TIN with no reason is an error, not a soft warning.
         filing = make_filing(rfi)
         make_record(filing, foreign_tin="")
         run_validation(filing)
-        finding = filing.findings.get(code="R-201")
-        assert finding.severity == "WARNING"
+        assert filing.findings.filter(code="R-204", severity="ERROR").exists()
+
+    def test_missing_tin_with_reason_is_warning(self, rfi, partners):
+        filing = make_filing(rfi)
+        make_record(filing, foreign_tin="", tin_unavailable_reason="Holder did not supply a TIN")
+        run_validation(filing)
+        assert filing.findings.get(code="R-201").severity == "WARNING"
+
+    def test_missing_address_is_error(self, rfi, partners):
+        filing = make_filing(rfi)
+        make_record(filing, holder_address="")
+        run_validation(filing)
+        assert filing.findings.filter(code="R-106", severity="ERROR").exists()
+
+    def test_undocumented_account_is_warning(self, rfi, partners):
+        filing = make_filing(rfi)
+        make_record(filing, self_certification="NOT_OBTAINED")
+        run_validation(filing)
+        assert filing.findings.filter(code="R-206", severity="WARNING").exists()
+
+    def test_passive_nfe_without_controlling_person_is_error(self, rfi, partners):
+        filing = make_filing(rfi)
+        make_record(filing, holder_type="ORGANISATION", acct_holder_type="CRS101")
+        run_validation(filing)
+        assert filing.findings.filter(code="R-108", severity="ERROR").exists()
 
     def test_implausible_tin_is_error(self, rfi, partners):
         filing = make_filing(rfi)

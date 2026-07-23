@@ -26,6 +26,13 @@
     <option value="INDIVIDUAL" {% if record.holder_type == 'INDIVIDUAL' %}selected{% endif %}>Individual</option>
     <option value="ORGANISATION" {% if record.holder_type == 'ORGANISATION' %}selected{% endif %}>Organisation</option>
   </select>
+  <label for="acct_holder_type">Entity account holder type (organisations)</label>
+  <select name="acct_holder_type" id="acct_holder_type">
+    <option value="">Not an entity / not set</option>
+    {% for code, label in acct_holder_types %}
+    <option value="{{ code }}" {% if record.acct_holder_type == code %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
   <label for="residence_country">Residence jurisdiction</label>
   <select name="residence_country" id="residence_country" class="flag-select" required>
     <option value="">Select jurisdiction</option>
@@ -33,23 +40,98 @@
     <option value="{{ j.code }}" {% if record.residence_country == j.code %}selected{% endif %}>{{ j.code|flag_glyph }}  {{ j.name }} ({{ j.code }})</option>
     {% endfor %}
   </select>
+  <label for="holder_address">Account holder address</label>
+  <input type="text" name="holder_address" id="holder_address" value="{{ record.holder_address }}" placeholder="Street, city, country" required>
+  <label for="birth_date">Date of birth (individuals)</label>
+  <input type="date" name="birth_date" id="birth_date" value="{{ record.birth_date|date:'Y-m-d' }}">
   <label for="foreign_tin">TIN issued by residence jurisdiction</label>
   <input type="text" name="foreign_tin" id="foreign_tin" value="{{ record.foreign_tin }}">
+  <label for="tin_unavailable_reason">Reason TIN not reported (if no TIN)</label>
+  <input type="text" name="tin_unavailable_reason" id="tin_unavailable_reason" value="{{ record.tin_unavailable_reason }}">
+  <label for="self_certification">Self-certification status</label>
+  <select name="self_certification" id="self_certification" required>
+    <option value="">Select status</option>
+    {% for code, label in self_cert_choices %}
+    <option value="{{ code }}" {% if record.self_certification == code %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
   <label for="account_number">Account number</label>
   <input type="text" name="account_number" id="account_number" value="{{ record.account_number }}" required>
-  <label for="balance">Account balance (NGN)</label>
+  <label for="currency">Currency</label>
+  <select name="currency" id="currency" required>
+    <option value="">Select currency</option>
+    {% for code, label in currencies %}
+    <option value="{{ code }}" {% if record.currency == code %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <label for="balance">Account balance</label>
   <input type="number" name="balance" id="balance" step="0.01" value="{{ record.balance }}">
-  <label for="dividends">Dividends (NGN)</label>
+  <label for="dividends">Dividends</label>
   <input type="number" name="dividends" id="dividends" step="0.01" value="{{ record.dividends }}">
-  <label for="interest">Interest (NGN)</label>
+  <label for="interest">Interest</label>
   <input type="number" name="interest" id="interest" step="0.01" value="{{ record.interest }}">
-  <label for="gross_proceeds">Gross proceeds (NGN)</label>
+  <label for="gross_proceeds">Gross proceeds</label>
   <input type="number" name="gross_proceeds" id="gross_proceeds" step="0.01" value="{{ record.gross_proceeds }}">
-  <label for="other_income">Other income (NGN)</label>
+  <label for="other_income">Other income</label>
   <input type="number" name="other_income" id="other_income" step="0.01" value="{{ record.other_income }}">
   <div class="actions-row">
     <button type="submit" class="btn">{% if filing.status == 'RETURNED' %}Save amendment{% else %}Save{% endif %}</button>
     <a class="btn secondary" href="/portal/filings/{{ filing.pk }}/">Cancel</a>
   </div>
 </form>
+
+<h2>Controlling persons</h2>
+<p class="muted">Required for a Passive NFE with controlling persons (entity account holder type CRS101).</p>
+
+<table class="data">
+  <thead><tr><th>Name</th><th>Residence</th><th>TIN</th><th>Type</th><th></th></tr></thead>
+  <tbody>
+    {% for cp in controlling_persons %}
+    <tr>
+      <td>{{ cp.name }}</td>
+      <td>{{ cp.residence_country }}</td>
+      <td class="mono">{{ cp.tin|default:"-" }}</td>
+      <td>{{ cp.get_ctrlg_person_type_display }}</td>
+      <td>
+        <form method="post" action="/portal/filings/{{ filing.pk }}/records/{{ record.pk }}/cp/{{ cp.pk }}/delete/" style="display:inline;"
+              onsubmit="return confirm('Remove controlling person {{ cp.name|escapejs }}?');">
+          {% csrf_token %}
+          <button type="submit" class="link-danger">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="muted">No controlling persons recorded.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="panel band" style="margin-top: 16px;">
+  <h2 style="margin-top: 0;">Add controlling person</h2>
+  <form method="post" action="/portal/filings/{{ filing.pk }}/records/{{ record.pk }}/cp/add/" class="stacked">
+    {% csrf_token %}
+    <label for="cp_name">Name</label>
+    <input type="text" name="cp_name" id="cp_name" required>
+    <label for="cp_residence">Residence jurisdiction</label>
+    <select name="cp_residence" id="cp_residence" class="flag-select" required>
+      <option value="">Select jurisdiction</option>
+      {% for j in jurisdictions %}
+      <option value="{{ j.code }}">{{ j.code|flag_glyph }}  {{ j.name }} ({{ j.code }})</option>
+      {% endfor %}
+    </select>
+    <label for="cp_tin">TIN</label>
+    <input type="text" name="cp_tin" id="cp_tin">
+    <label for="cp_address">Address</label>
+    <input type="text" name="cp_address" id="cp_address">
+    <label for="cp_dob">Date of birth</label>
+    <input type="date" name="cp_dob" id="cp_dob">
+    <label for="cp_type">Controlling person type</label>
+    <select name="cp_type" id="cp_type">
+      {% for code, label in ctrlg_person_types %}
+      <option value="{{ code }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+    <div class="actions-row"><button type="submit" class="btn secondary">Add controlling person</button></div>
+  </form>
+</div>
 {% endblock %}

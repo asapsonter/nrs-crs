@@ -10,9 +10,19 @@
   <span class="list-count">{{ filings|length }} filing{{ filings|length|pluralize }} <span class="dim">all statuses</span></span>
   <div class="actions-row">
     <a class="btn" href="/portal/submit/">Start a new submission</a>
+    {% if delete_mode %}
+    <a class="btn secondary" href="/portal/filings/">Done deleting</a>
+    {% else %}
     <a class="btn secondary" href="/portal/filings/drafts/">View draft filings</a>
+    {% endif %}
   </div>
 </div>
+
+{% if delete_mode %}
+<div class="flash error">
+  <strong>Delete mode.</strong> Select a filing to delete. Only filings not yet submitted to the NRS can be removed, and deletion cannot be undone.
+</div>
+{% endif %}
 
 <table class="data">
   <thead><tr><th>Reference</th><th>Year</th><th>Type</th><th>Records</th><th>Status</th><th>Prepared by</th><th>Created</th><th></th></tr></thead>
@@ -21,12 +31,26 @@
     <tr>
       <td class="mono">{{ filing.reference }}</td>
       <td>{{ filing.reporting_year }}</td>
-      <td>{{ filing.get_kind_display }} ({{ filing.message_type }})</td>
+      <td>{{ filing.get_kind_display }}{% if filing.is_crs_data %} ({{ filing.message_type }}){% endif %}</td>
       <td class="num">{{ filing.record_count }}</td>
       <td>{% pill filing.status filing.get_status_display %}</td>
       <td>{{ filing.created_by.display_name|default:"-" }}</td>
       <td>{{ filing.created_at|date:"Y-m-d" }}</td>
-      <td><a href="/portal/filings/{{ filing.pk }}/">Open</a></td>
+      <td>
+        {% if delete_mode %}
+          {% if filing.is_deletable %}
+          <form method="post" action="/portal/filings/{{ filing.pk }}/delete/" class="row-delete"
+                onsubmit="return confirm('Delete {{ filing.reference }}? This cannot be undone.');">
+            {% csrf_token %}
+            <button type="submit" class="link-danger">Delete</button>
+          </form>
+          {% else %}
+          <span class="muted" title="A filing submitted to the NRS cannot be deleted.">Locked</span>
+          {% endif %}
+        {% else %}
+        <a href="/portal/filings/{{ filing.pk }}/">Open</a>
+        {% endif %}
+      </td>
     </tr>
     {% empty %}
     <tr><td colspan="8" class="muted">No filings yet.</td></tr>

@@ -24,7 +24,16 @@
       <span class="pt-menu-group">Workspace</span>
       <a href="/portal/filings/drafts/" class="{% if nav == 'drafts' %}active{% endif %}">Draft Filings</a>
       <a href="/portal/submit/" class="{% if nav == 'submit' %}active{% endif %}">Submissions</a>
-      <a href="/portal/filings/" class="{% if nav == 'filings' %}active{% endif %}">Manage Filings</a>
+      <div class="pt-item-sub">
+        <a href="/portal/filings/" class="pt-item-main {% if nav == 'filings' %}active{% endif %}">
+          Manage Filings
+          <span class="pt-caret" aria-hidden="true">&rsaquo;</span>
+        </a>
+        <div class="pt-submenu" role="group" aria-label="Manage Filings actions">
+          <a href="/portal/filings/create/">Create filing</a>
+          <a href="/portal/filings/?mode=delete">Delete filing</a>
+        </div>
+      </div>
       <a href="/portal/documents/" class="{% if nav == 'documents' %}active{% endif %}">Documents</a>
       <span class="pt-menu-group">Account</span>
       <a href="/portal/profile/" class="{% if nav == 'profile' %}active{% endif %}">Reporting Entity Profile</a>
@@ -47,7 +56,7 @@
       <div class="pt-topbar-user">
         <div class="pt-user-meta">
           <span class="name">{{ user.portal_profile.display_name }}</span>
-          <span class="role">{{ user.portal_profile.get_role_display }}</span>
+          <span class="pt-role-badge {{ user.portal_profile.role|lower }}">{{ user.portal_profile.get_role_display }}</span>
         </div>
         <span class="pt-avatar" aria-hidden="true">{{ user.portal_profile.display_name|slice:":1"|upper }}</span>
       </div>

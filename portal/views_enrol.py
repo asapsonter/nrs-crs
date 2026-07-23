@@ -4,6 +4,8 @@ from __future__ import annotations
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.shortcuts import render
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 
 from core import config
 from core.models import AuditLog
@@ -24,6 +26,7 @@ REQUIRED_FIELDS: list[tuple[str, str]] = [
     ("Post code", "post_code"),
     ("Primary User surname", "pu_surname"),
     ("Primary User first name", "pu_first_name"),
+    ("Date of birth", "pu_dob"),
     ("Primary User position", "pu_designation"),
     ("Primary User email", "pu_email"),
     ("Primary User telephone", "pu_phone"),
@@ -53,6 +56,7 @@ def enrol(request):
             "post_code": request.POST.get("post_code", "").strip(),
             "pu_surname": request.POST.get("pu_surname", "").strip(),
             "pu_first_name": request.POST.get("pu_first_name", "").strip(),
+            "pu_dob": parse_date(request.POST.get("pu_dob", "").strip() or "") or None,
             "pu_designation": request.POST.get("pu_designation", "").strip(),
             "pu_email": request.POST.get("pu_email", "").strip().lower(),
             "pu_phone_cc": pu_phone_cc if pu_phone_cc in valid_codes else "+234",
@@ -78,6 +82,9 @@ def enrol(request):
                 validate_email(fields["pu_email"])
             except ValidationError:
                 errors.append("The Primary User email is not a valid email address.")
+
+        if fields["pu_dob"] and fields["pu_dob"] > timezone.now().date():
+            errors.append("The date of birth cannot be in the future.")
 
         id_document = request.FILES.get("id_document")
         if id_document is None:

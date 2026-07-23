@@ -1,0 +1,57 @@
+{% extends "portal/base.html" %}
+{% block title %}Create Filing · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+{% include "portal/deadline_banner.html" %}
+<h1>Create Filing</h1>
+<p class="page-sub">Open a new filing for {{ profile.rfi.legal_name }}. Give the filing a name, choose its type, and set the period it covers. The type you choose determines the next step: a CRS data filing opens for you to add or upload records, while an administrative notice is recorded as a draft for completion.</p>
+
+{% if errors %}
+<div class="error-text">
+  {% for error in errors %}{{ error }}<br>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="/portal/filings/create/" class="stacked create-filing-form">
+  {% csrf_token %}
+  <p class="req-note">Fields marked <span class="req-star">*</span> are required.</p>
+
+  <section class="fset">
+    <div class="fset-head">
+      <span class="fset-num">1</span>
+      <div class="fset-heading">
+        <h2 class="fset-title">Filing details</h2>
+        <p class="fset-hint">These details identify the filing across the Portal and the NRS.</p>
+      </div>
+    </div>
+    <div class="fset-body">
+      <div class="field">
+        <label for="name">Filing Name</label>
+        <input type="text" name="name" id="name" value="{{ values.name|default:'' }}"
+               placeholder="For example, CRS annual return 2024" required>
+      </div>
+      <div class="fset-grid">
+        <div class="field">
+          <label for="filing_type">Filing Type</label>
+          <select name="filing_type" id="filing_type" required>
+            <option value="">Select filing type</option>
+            {% for value, label in filing_types %}
+            <option value="{{ value }}" {% if values.filing_type == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="period_end_date">Period end date</label>
+          <input type="date" name="period_end_date" id="period_end_date" value="{{ values.period_end_date|default:'' }}" required>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="enrol-actions">
+    <p class="enrol-actions-note">You can review and complete the filing after it is created.</p>
+    <button type="submit" class="btn">Create</button>
+  </div>
+</form>
+
+<div class="back-nav"><a class="btn-back" href="/portal/filings/">Back to filings</a></div>
+{% endblock %}

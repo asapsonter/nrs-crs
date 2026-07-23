@@ -8,7 +8,7 @@ from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404, redirect, render
 
 from core import config
-from core.decorators import checker_required, portal_required
+from core.decorators import portal_required
 from core.models import AuditLog
 from exchange.services import days_to_domestic_deadline, domestic_deadline
 from portal.models import Filing, PortalUser, ReportingFI
@@ -139,10 +139,21 @@ def home(request):
     return render(request, "portal/home.html", context)
 
 
-@checker_required
+@portal_required
 def users(request):
-    """Checker administration: invite users, approve Maker registrations."""
+    """Checker administration: invite users, approve Maker registrations.
+
+    Restricted to Checkers. A Maker who reaches this URL is sent back to the
+    portal home with an explanation rather than a bare 404.
+    """
     profile = request.portal_profile
+    if profile.role != PortalUser.Role.CHECKER:
+        messages.info(
+            request,
+            "Managing users is available to the Primary User and other Checkers. "
+            "Ask a Checker at your institution to add or approve users.",
+        )
+        return redirect("/portal/")
     rfi = profile.rfi
     if request.method == "POST":
         action = request.POST.get("action", "")

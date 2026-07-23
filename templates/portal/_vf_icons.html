@@ -1,0 +1,10 @@
+{% spaceless %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{% if i == "formset" %}<rect x="8" y="3" width="13" height="13" rx="2"/><path d="M16 16v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3"/>
+{% elif i == "folder" %}<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+{% elif i == "repeat" %}<path d="M6 8l-2 0a1 1 0 0 0-1 1v9a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1v-1"/><path d="M8 4a2 2 0 0 0-2 2v9a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V9a2 2 0 0 0-2-2h-7l-2-2z"/>
+{% elif i == "form" %}<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h4.5"/>
+{% elif i == "add" %}<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M12 8.5v7M8.5 12h7"/>
+{% endif %}
+</svg>
+{% endspaceless %}

@@ -1,0 +1,28 @@
+{% extends "portal/base.html" %}
+{% block title %}Filing created · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<div class="success-screen">
+  <div class="success-card">
+    <span class="success-check" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+    </span>
+    <h1 class="success-title">New Filing created successfully</h1>
+    <p class="success-body">
+      Your filing named &ldquo;<strong>{{ filing.name|default:filing.get_kind_display }}</strong>&rdquo; has been successfully created with the reference number
+      &ldquo;<span class="success-ref">{{ filing.reference }}</span>&rdquo;. You can now access the filing in the draft filing area.
+    </p>
+
+    <dl class="success-meta">
+      <div><dt>Filing type</dt><dd>{{ filing.get_kind_display }}</dd></div>
+      {% if filing.period_end_date %}<div><dt>Period end date</dt><dd>{{ filing.period_end_date|date:"j M Y" }}</dd></div>{% endif %}
+      <div><dt>Status</dt><dd>Draft</dd></div>
+    </dl>
+
+    <div class="success-actions">
+      <a class="btn" href="/portal/filings/drafts/">Go to Draft Filings</a>
+      <a class="btn secondary" href="/portal/filings/{{ filing.pk }}/">Open filing</a>
+      <a class="btn ghost" href="/portal/filings/create/">Create another filing</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

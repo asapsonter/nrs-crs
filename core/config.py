@@ -21,6 +21,12 @@ EXCHANGE_DEADLINE_DAY: int = 30
 # Sending jurisdiction code for MessageRefID construction.
 SENDING_JURISDICTION: str = "NG"
 
+# Competent-authority identity used in the outbound MessageSpec. This is the
+# NRS as transmitting competent authority, distinct from each RFI's own
+# Sending Company IN carried at ReportingFI level.
+NRS_SENDING_COMPANY_IN: str = "NRS-NG-CA"
+NRS_CONTACT: str = "Automatic Exchange of Information Unit, Nigeria Revenue Service"
+
 # Activated CRS MCAA exchange relationships seeded into the demo.
 # (code, name, activated_since, public key fingerprint shown in the UI)
 PARTNER_JURISDICTIONS: list[tuple[str, str, str, str]] = [
@@ -64,6 +70,26 @@ DIAL_CODES: list[tuple[str, str]] = [
     ("+91", "IN +91"),
     ("+41", "CH +41"),
     ("+230", "MU +230"),
+]
+
+# Account currencies offered on the filing record form. No default is applied;
+# the preparer must select the currency of each reported account.
+CURRENCIES: list[tuple[str, str]] = [
+    ("NGN", "NGN - Nigerian Naira"),
+    ("USD", "USD - US Dollar"),
+    ("EUR", "EUR - Euro"),
+    ("GBP", "GBP - Pound Sterling"),
+    ("CHF", "CHF - Swiss Franc"),
+    ("CAD", "CAD - Canadian Dollar"),
+    ("AUD", "AUD - Australian Dollar"),
+    ("JPY", "JPY - Japanese Yen"),
+    ("CNY", "CNY - Chinese Yuan"),
+    ("AED", "AED - UAE Dirham"),
+    ("ZAR", "ZAR - South African Rand"),
+    ("GHS", "GHS - Ghanaian Cedi"),
+    ("KES", "KES - Kenyan Shilling"),
+    ("INR", "INR - Indian Rupee"),
+    ("MUR", "MUR - Mauritian Rupee"),
 ]
 
 # Inbound taxpayer-matching risk bands. An inbound record matched to a

@@ -53,9 +53,11 @@ class ReportingFI(models.Model):
     phone = models.CharField("Financial Institution phone", max_length=30, blank=True, default="")
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.SUBMITTED)
 
-    # Primary User. Name is captured as surname and first name.
+    # Primary User. Name is captured as surname and first name. For a
+    # stakeholder or individual enrolment this is the natural person enrolling.
     pu_surname = models.CharField("Primary User surname", max_length=80, blank=True, default="")
     pu_first_name = models.CharField("Primary User first name", max_length=80, blank=True, default="")
+    pu_dob = models.DateField("Date of birth", null=True, blank=True)
     pu_designation = models.CharField("Primary User position", max_length=120)
     pu_email = models.EmailField("Primary User email")
     pu_phone_cc = models.CharField("Primary User phone country code", max_length=6, blank=True, default="+234")
@@ -187,9 +189,17 @@ class Filing(models.Model):
     """
 
     class Kind(models.TextChoices):
-        XML_UPLOAD = "XML_UPLOAD", "CRS XML upload"
-        MANUAL = "MANUAL", "Manual entry"
+        XML_UPLOAD = "XML_UPLOAD", "CRS XML upload Filing"
+        MANUAL = "MANUAL", "CRS Manual Entry Filing"
         NIL = "NIL", "Nil return"
+        PU_CHANGE = "PU_CHANGE", "Primary User Change Notice"
+        ENTITY_DEACTIVATION = "ENTITY_DEACTIVATION", "Reporting Entity Deactivation"
+        ENTITY_INFO_CHANGE = "ENTITY_INFO_CHANGE", "Change of reporting entity information"
+
+    # The three CRS data filing kinds carry account reports and a CRS message
+    # type; the remaining kinds are administrative notices.
+    CRS_DATA_KINDS = (Kind.XML_UPLOAD, Kind.MANUAL, Kind.NIL)
+    NOTICE_KINDS = (Kind.PU_CHANGE, Kind.ENTITY_DEACTIVATION, Kind.ENTITY_INFO_CHANGE)
 
     class MessageType(models.TextChoices):
         CRS701 = "CRS701", "CRS701 New data"
@@ -206,11 +216,19 @@ class Filing(models.Model):
         IN_EXCHANGE = "IN_EXCHANGE", "Included in Exchange"
 
     reference = models.CharField(max_length=24, unique=True)
+    name = models.CharField("Filing name", max_length=200, blank=True, default="")
+    revision = models.PositiveIntegerField(default=1)
     rfi = models.ForeignKey(ReportingFI, on_delete=models.CASCADE, related_name="filings")
     reporting_year = models.PositiveIntegerField(default=config.CURRENT_REPORTING_YEAR)
-    kind = models.CharField(max_length=12, choices=Kind.choices)
+    period_end_date = models.DateField("Period end date", null=True, blank=True)
+    kind = models.CharField(max_length=20, choices=Kind.choices)
     message_type = models.CharField(max_length=8, choices=MessageType.choices, default=MessageType.CRS701)
     status = models.CharField(max_length=18, choices=Status.choices, default=Status.DRAFT)
+
+    # CRS message header, captured on the General Information form.
+    receiving_country = models.CharField("Receiving country", max_length=2, blank=True, default="")
+    sending_company_in = models.CharField("Sending Company IN", max_length=40, blank=True, default="")
+    message_reference = models.CharField("Message reference", max_length=80, blank=True, default="")
 
     created_by = models.ForeignKey(PortalUser, null=True, on_delete=models.SET_NULL, related_name="filings_created")
     checker = models.ForeignKey(PortalUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="filings_checked")
@@ -246,6 +264,41 @@ class Filing(models.Model):
     def record_count(self) -> int:
         return self.account_reports.count()
 
+    @property
+    def is_crs_data(self) -> bool:
+        """Whether this filing is a CRS data return (carries account reports)."""
+        return self.kind in self.CRS_DATA_KINDS
+
+    @property
+    def data_status(self) -> str:
+        """Whether the filing yet holds reportable data, for the draft list."""
+        if self.kind == self.Kind.NIL:
+            return "No Data"
+        return "Data" if self.record_count else "No Data"
+
+    @property
+    def category_label(self) -> str:
+        """A short workflow category shown in the draft filing list."""
+        return {
+            self.Status.DRAFT: "Waiting",
+            self.Status.PENDING_CHECKER: "Awaiting Checker",
+            self.Status.RETURNED: "Correction",
+        }.get(self.status, self.get_status_display())
+
+    @property
+    def is_deletable(self) -> bool:
+        """Whether the institution may delete this filing.
+
+        Only filings still in the institution's hands can be deleted. Once a
+        filing has been submitted to the NRS it is part of the exchange record
+        and cannot be removed from the Portal.
+        """
+        return self.status in (
+            self.Status.DRAFT,
+            self.Status.PENDING_CHECKER,
+            self.Status.RETURNED,
+        )
+
 
 class AccountReport(models.Model):
     """One reportable account within a filing.
@@ -260,6 +313,18 @@ class AccountReport(models.Model):
         OECD2 = "OECD2", "OECD2 Correction"
         OECD3 = "OECD3", "OECD3 Deletion"
 
+    class AcctHolderType(models.TextChoices):
+        """CRS entity account-holder type. Applies to Organisation holders."""
+        CRS101 = "CRS101", "CRS101 Passive NFE with controlling person(s)"
+        CRS102 = "CRS102", "CRS102 CRS Reportable Person"
+        CRS103 = "CRS103", "CRS103 Passive NFE that is a CRS Reportable Person"
+
+    class SelfCertification(models.TextChoices):
+        """Due-diligence status of the account holder self-certification."""
+        OBTAINED = "OBTAINED", "Obtained and validated"
+        CURED = "CURED", "Cured after remediation"
+        NOT_OBTAINED = "NOT_OBTAINED", "Not obtained (undocumented)"
+
     filing = models.ForeignKey(Filing, on_delete=models.CASCADE, related_name="account_reports")
     doc_ref_id = models.CharField(max_length=80, unique=True)
     corr_doc_ref_id = models.CharField(max_length=80, blank=True, default="")
@@ -271,8 +336,29 @@ class AccountReport(models.Model):
         choices=[("INDIVIDUAL", "Individual"), ("ORGANISATION", "Organisation")],
         default="INDIVIDUAL",
     )
+    # Entity account-holder type (Organisation holders); blank for individuals.
+    acct_holder_type = models.CharField(
+        "Entity account holder type", max_length=6, choices=AcctHolderType.choices, blank=True, default=""
+    )
     residence_country = models.CharField("Residence jurisdiction", max_length=2)
     foreign_tin = models.CharField("TIN issued by residence jurisdiction", max_length=40, blank=True, default="")
+    tin_unavailable_reason = models.CharField(
+        "Reason TIN not reported", max_length=200, blank=True, default=""
+    )
+
+    # CRS AccountHolder Address (mandatory in the CRS XML schema).
+    holder_address = models.CharField("Account holder address", max_length=300, blank=True, default="")
+    address_country = models.CharField("Address country", max_length=2, blank=True, default="")
+
+    # CRS BirthInfo (individual holders).
+    birth_date = models.DateField("Date of birth", null=True, blank=True)
+    birth_city = models.CharField("City of birth", max_length=120, blank=True, default="")
+
+    # Due-diligence: self-certification status per CRS Regulations 2019.
+    self_certification = models.CharField(
+        max_length=14, choices=SelfCertification.choices, blank=True, default=""
+    )
+
     account_number = models.CharField(max_length=40)
     balance = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
     currency = models.CharField(max_length=3, default="NGN")
@@ -291,6 +377,67 @@ class AccountReport(models.Model):
 
     def __str__(self) -> str:
         return f"{self.doc_ref_id} {self.holder_name}"
+
+    @property
+    def is_undocumented(self) -> bool:
+        """An account whose holder self-certification was never obtained."""
+        return self.self_certification == self.SelfCertification.NOT_OBTAINED
+
+    @property
+    def requires_controlling_persons(self) -> bool:
+        """Passive NFEs with controlling persons must report them (CRS101)."""
+        return (
+            self.holder_type == "ORGANISATION"
+            and self.acct_holder_type == self.AcctHolderType.CRS101
+        )
+
+    @property
+    def address_country_code(self) -> str:
+        """Address country, falling back to residence for the CRS Address."""
+        return self.address_country or self.residence_country
+
+
+class ControllingPerson(models.Model):
+    """A controlling person of a Passive NFE account holder (CRS).
+
+    Reported inside the AccountReport when the entity holder is a Passive NFE
+    with one or more controlling persons (AcctHolderType CRS101).
+    """
+
+    class CtrlgPersonType(models.TextChoices):
+        CRS801 = "CRS801", "CRS801 Ownership of legal person"
+        CRS802 = "CRS802", "CRS802 Other means of control of legal person"
+        CRS803 = "CRS803", "CRS803 Senior managing official"
+        CRS804 = "CRS804", "CRS804 Trust settlor"
+        CRS805 = "CRS805", "CRS805 Trust trustee"
+        CRS806 = "CRS806", "CRS806 Trust protector"
+        CRS807 = "CRS807", "CRS807 Trust beneficiary"
+        CRS808 = "CRS808", "CRS808 Trust other"
+        CRS809 = "CRS809", "CRS809 Legal arrangement settlor-equivalent"
+        CRS810 = "CRS810", "CRS810 Legal arrangement trustee-equivalent"
+        CRS811 = "CRS811", "CRS811 Legal arrangement protector-equivalent"
+        CRS812 = "CRS812", "CRS812 Legal arrangement beneficiary-equivalent"
+        CRS813 = "CRS813", "CRS813 Legal arrangement other-equivalent"
+
+    account_report = models.ForeignKey(
+        AccountReport, on_delete=models.CASCADE, related_name="controlling_persons"
+    )
+    name = models.CharField("Controlling person name", max_length=200)
+    residence_country = models.CharField("Residence jurisdiction", max_length=2)
+    tin = models.CharField("TIN", max_length=40, blank=True, default="")
+    address = models.CharField("Address", max_length=300, blank=True, default="")
+    birth_date = models.DateField("Date of birth", null=True, blank=True)
+    ctrlg_person_type = models.CharField(
+        "Controlling person type", max_length=6, choices=CtrlgPersonType.choices,
+        default=CtrlgPersonType.CRS801,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.get_ctrlg_person_type_display()})"
 
 
 class ValidationFinding(models.Model):

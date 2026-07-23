@@ -70,12 +70,20 @@ def run_validation(filing: Filing) -> tuple[int, int]:
                 f"Residence jurisdiction {record.residence_country} is not on the activated partner list.",
             )
         if not record.foreign_tin.strip():
-            record_finding(
-                record,
-                "WARNING",
-                "R-201",
-                "No TIN reported for the account holder. Partner jurisdictions may reject the record.",
-            )
+            if record.tin_unavailable_reason.strip():
+                record_finding(
+                    record,
+                    "WARNING",
+                    "R-201",
+                    "No TIN reported; a reason was provided. Partner jurisdictions may still query the record.",
+                )
+            else:
+                record_finding(
+                    record,
+                    "ERROR",
+                    "R-204",
+                    "No TIN reported and no reason given. CRS 2.0 requires a reason when a TIN is unavailable.",
+                )
         elif not TIN_PATTERN.match(record.foreign_tin.strip()):
             record_finding(
                 record,
@@ -83,6 +91,34 @@ def run_validation(filing: Filing) -> tuple[int, int]:
                 "R-202",
                 f"TIN '{record.foreign_tin}' fails the plausibility check.",
             )
+
+        # Address is mandatory in the CRS AccountHolder element.
+        if not record.holder_address.strip():
+            record_finding(record, "ERROR", "R-106", "Account holder address is missing (mandatory in CRS).")
+
+        # Self-certification / due diligence.
+        if not record.self_certification:
+            record_finding(record, "WARNING", "R-205", "No self-certification status recorded for the account.")
+        elif record.is_undocumented:
+            record_finding(
+                record,
+                "WARNING",
+                "R-206",
+                "Account is undocumented: holder self-certification was not obtained.",
+            )
+
+        # Entity account holders: classification and controlling persons.
+        if record.holder_type == "ORGANISATION":
+            if not record.acct_holder_type:
+                record_finding(record, "WARNING", "R-107", "Entity account holder type (CRS101/102/103) is not set.")
+            if record.requires_controlling_persons and not record.controlling_persons.exists():
+                record_finding(
+                    record,
+                    "ERROR",
+                    "R-108",
+                    "Passive NFE (CRS101) reports no controlling persons.",
+                )
+
         if record.balance < 0:
             record_finding(record, "ERROR", "R-301", f"Account balance {record.balance} is negative.")
         if record.opened_date and record.opened_date.year > filing.reporting_year:

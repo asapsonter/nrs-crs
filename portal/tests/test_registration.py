@@ -41,6 +41,7 @@ def submit_enrolment(client: Client | None = None) -> ReportingFI:
             "post_code": "101241",
             "pu_surname": "Bello",
             "pu_first_name": "Ngozi",
+            "pu_dob": "1985-06-15",
             "pu_designation": "Head, Regulatory Reporting",
             "pu_email": "ngozi.bello@zenithtrust.ng",
             "pu_phone_cc": "+234",
@@ -58,6 +59,29 @@ class TestEnrolmentStateMachine:
         rfi = submit_enrolment()
         assert rfi.status == ReportingFI.Status.SUBMITTED
         assert rfi.reference.startswith("NRS-RFI-")
+
+    def test_date_of_birth_is_captured(self):
+        rfi = submit_enrolment()
+        assert str(rfi.pu_dob) == "1985-06-15"
+
+    def test_date_of_birth_is_required(self):
+        letter = SimpleUploadedFile("ceo_letter.pdf", b"%PDF-1.4 demo", content_type="application/pdf")
+        identity = SimpleUploadedFile("pu_id.pdf", b"%PDF-1.4 demo", content_type="application/pdf")
+        response = Client().post(
+            "/portal/enrol/",
+            {
+                "legal_name": "No DOB Bank", "tin": "0450088899", "category": "DEPOSITORY_INSTITUTION",
+                "enrolment_type": "INDIVIDUAL", "email": "a@b.ng", "email_confirm": "a@b.ng",
+                "phone_cc": "+234", "phone": "8010000000", "street": "1 A St", "city": "Lagos",
+                "state_province": "Lagos", "post_code": "100001", "pu_surname": "Doe",
+                "pu_first_name": "Jane", "pu_designation": "Self", "pu_email": "jane@b.ng",
+                "pu_phone_cc": "+234", "pu_phone": "8010000001",
+                "id_document": identity, "ceo_letter": letter,
+            },
+        )
+        assert response.status_code == 200
+        assert "Date of birth is required." in response.content.decode()
+        assert not ReportingFI.objects.filter(tin="0450088899").exists()
 
     def test_review_moves_to_under_review(self):
         rfi = submit_enrolment()
