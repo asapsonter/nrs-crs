@@ -771,6 +771,51 @@ table.data td.muted { color: var(--gray-muted); }
 .vf-code.crs { background: #FDECEC; color: #8A0000; }
 .vf-code.rfi { background: #E7F3EC; color: #016B41; }
 .vf-code.ai { background: #ECEBFB; color: #4B3F9E; }
+.vf-code.cp { background: #FDF3E3; color: #96610C; }
+
+/* Folder expand and collapse toggle (+ / -). */
+.vf-toggle {
+  flex: none;
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 5px;
+  background: #FFFFFF; color: var(--charcoal-2);
+  font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.vf-toggle:hover { border-color: var(--red); color: var(--red); }
+.vf-node.vf-collapsed > ul { display: none; }
+
+/* Validate and Submit panel below the tree. */
+.vf-submit-panel { margin-top: var(--s3); }
+.vf-submit-ready {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+  flex-wrap: wrap;
+  background: #F2FAF5; border: 1px solid #B9E0C8; border-radius: 12px;
+  padding: 16px 20px;
+}
+.vf-submit-ready form { margin: 0; }
+.vf-submit-blocked {
+  background: #FDF3E3; border: 1px solid #EFD3A0; border-radius: 12px;
+  padding: 14px 20px; font-size: 14px; color: #6b4a0c;
+}
+.vf-submit-blocked strong { color: #96610C; }
+.vf-todo { margin: 6px 0 0; padding-left: 20px; }
+.vf-todo li { margin: 3px 0; }
+
+/* Conditional form fields: controls that do not apply to the selected
+   holder type are blurred and inert rather than hidden, so the preparer can
+   see the full CRS form while only completing what applies. */
+form.stacked .is-blurred,
+.panel.is-blurred form,
+.panel.is-blurred table {
+  filter: blur(1.3px);
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+}
+label.is-dim { opacity: 0.45; }
+.panel.is-blurred h2 { opacity: 0.55; }
 
 .vf-count {
   min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px;
@@ -1531,6 +1576,16 @@ form.stacked .phone-group input { flex: 1 1 auto; width: auto; max-width: none; 
 
 .fset-body { display: flex; flex-direction: column; }
 .fset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s1) var(--s3); }
+.fset-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+
+/* Person name entry: surname, middle name, other names on one line. */
+.name-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s1) var(--s2); }
+.name-grid .field { display: flex; flex-direction: column; margin-top: var(--s2); }
+.name-grid .field label { margin: 0 0 5px; }
+form.stacked .name-grid input { width: 100%; max-width: none; }
+@media (max-width: 640px) {
+  .fset-grid.three, .name-grid { grid-template-columns: 1fr; }
+}
 
 /* Field cell: label sits directly on the control, spacing driven by the
    flow rather than per-label margins so cards align cleanly. */
@@ -1556,7 +1611,35 @@ form.stacked .field .phone-group input { width: auto; }
   padding-top: var(--s3);
   border-top: 1px solid var(--border);
 }
-.enrol-actions-note { font-size: var(--fs-small); color: var(--gray-muted); margin: 0; max-width: 46ch; }
+.enrol-actions-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--green-dark);
+  background: var(--green-tint);
+  border: 1px solid var(--green);
+  border-left: 4px solid var(--green);
+  border-radius: 4px;
+  padding: 12px var(--s2);
+  margin: 0;
+  max-width: 56ch;
+}
+.enrol-actions-note::before {
+  content: "!";
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
 
 @media (max-width: 640px) {
   .fset-grid { grid-template-columns: 1fr; }

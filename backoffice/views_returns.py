@@ -44,7 +44,8 @@ def queue(request):
 def detail(request, filing_id: int):
     filing = get_object_or_404(Filing, pk=filing_id)
     caps = request.caps
-    officer = request.credential.officer
+    credential = getattr(request, "credential", None)
+    officer = credential.officer if credential else None
     file_findings = filing.findings.filter(account_report__isnull=True)
     record_findings = filing.findings.filter(account_report__isnull=False).select_related("account_report")
     blocking = blocking_findings(filing)
@@ -56,6 +57,7 @@ def detail(request, filing_id: int):
     four_eyes_blocked = (
         access.APPROVE_RETURNS in caps
         and filing.status == Filing.Status.UNDER_VALIDATION
+        and officer is not None
         and filing.validated_by_id == officer.pk
     )
     can_approve = (
@@ -71,7 +73,10 @@ def detail(request, filing_id: int):
         "backoffice/returns_detail.html",
         {
             "filing": filing,
-            "records": filing.account_reports.all(),
+            "records": filing.account_reports.prefetch_related("controlling_persons"),
+            "header_done": bool(
+                filing.receiving_country and filing.sending_company_in and filing.message_reference
+            ),
             "file_findings": file_findings,
             "record_findings": record_findings,
             "blocking_count": blocking.count(),

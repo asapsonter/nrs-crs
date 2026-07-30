@@ -1,5 +1,5 @@
 {% extends "backoffice/base.html" %}
-{% load pills flags %}
+{% load pills flags humanize %}
 {% block title %}{{ filing.reference }} · Returns{% endblock %}
 {% block content %}
 <h1>{{ filing.reference }}</h1>
@@ -68,19 +68,77 @@
 </table>
 {% endif %}
 
-{% if filing.kind != 'NIL' %}
+{% if filing.is_crs_data %}
+<h2>Filing structure</h2>
+<p class="muted">The filing as the institution prepared it: the CRS message header, then the report with its Reporting FI and account forms.</p>
+<div class="bo-tree">
+  <div class="bo-tree-row depth-0">
+    <span class="bt-tag gi">GI</span>
+    <span class="bt-title">General Information</span>
+    <span class="bt-meta">
+      {% if filing.receiving_country %}Receiving {{ filing.receiving_country|flag }}{{ filing.receiving_country }} &middot; {% endif %}
+      {{ filing.message_type }}{% if filing.message_reference %} &middot; Ref {{ filing.message_reference }}{% endif %}
+    </span>
+    {% if header_done %}<span class="pill approved">Validated</span>{% else %}<span class="pill review">In Draft</span>{% endif %}
+  </div>
+  <div class="bo-tree-row depth-1">
+    <span class="bt-tag rfi">RFI</span>
+    <span class="bt-title">Reporting FI Information</span>
+    <span class="bt-meta">{{ filing.rfi.legal_name }} &middot; TIN {{ filing.rfi.tin }}</span>
+    <span class="pill approved">Validated</span>
+  </div>
+  {% for record in records %}
+  <div class="bo-tree-row depth-1 {% if record.superseded %}is-superseded{% endif %}">
+    <span class="bt-tag ai">AI</span>
+    <span class="bt-title">{{ record.holder_name }}</span>
+    <span class="bt-meta">
+      {% if record.holder_type == 'ORGANISATION' %}Entity{% if record.acct_holder_type %} {{ record.acct_holder_type }}{% endif %}{% else %}Individual{% if record.birth_date %} &middot; DOB {{ record.birth_date|date:"Y-m-d" }}{% endif %}{% endif %}
+      &middot; {{ record.residence_country|flag }}{{ record.residence_country }}
+      &middot; {{ record.account_number }} &middot; {{ record.balance|intcomma }} {{ record.currency }}
+    </span>
+    {% if record.superseded %}<span class="pill neutral">Superseded</span>
+    {% elif record.is_complete %}<span class="pill approved">Complete</span>
+    {% else %}<span class="pill review">Incomplete</span>{% endif %}
+    {% if record.self_certification == 'NOT_OBTAINED' %}<span class="pill error">Undocumented</span>{% endif %}
+  </div>
+  {% for cp in record.controlling_persons.all %}
+  <div class="bo-tree-row depth-2">
+    <span class="bt-tag cp">CP</span>
+    <span class="bt-title">{{ cp.name }}</span>
+    <span class="bt-meta">{{ cp.residence_country|flag }}{{ cp.residence_country }} &middot; {{ cp.get_ctrlg_person_type_display }}</span>
+  </div>
+  {% endfor %}
+  {% empty %}
+  {% if filing.kind != 'NIL' %}
+  <div class="bo-tree-row depth-1"><span class="bt-tag ai">AI</span><span class="bt-title muted">No account reports</span></div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if filing.kind != 'NIL' and filing.is_crs_data %}
 <h2>Account reports</h2>
+<div style="overflow-x: auto;">
 <table class="data">
-  <thead><tr><th>DocRefID</th><th>Holder</th><th>Residence</th><th>TIN</th><th>Account</th><th>Balance</th><th>Lineage</th></tr></thead>
+  <thead><tr><th>DocRefID</th><th>Holder</th><th>Type</th><th>Residence</th><th>TIN</th><th>Address</th><th>Self-cert</th><th>CPs</th><th>Account Number</th><th>Balance</th><th>Lineage</th></tr></thead>
   <tbody>
     {% for record in records %}
     <tr {% if record.superseded %}style="opacity: 0.55;"{% endif %}>
       <td class="mono">{{ record.doc_ref_id }}</td>
       <td>{{ record.holder_name }}</td>
+      <td>{% if record.holder_type == 'ORGANISATION' %}{{ record.acct_holder_type|default:"Entity" }}{% else %}Individual{% endif %}</td>
       <td>{{ record.residence_country|flag }}{{ record.residence_country }}</td>
-      <td class="mono">{{ record.foreign_tin|default:"-" }}</td>
+      <td class="mono">{{ record.foreign_tin|default:record.tin_unavailable_reason|default:"-" }}</td>
+      <td>{% if record.holder_address %}{{ record.holder_address|truncatechars:28 }}{% else %}<span class="pill error">Missing</span>{% endif %}</td>
+      <td>
+        {% if record.self_certification == 'OBTAINED' %}<span class="pill approved">Obtained</span>
+        {% elif record.self_certification == 'CURED' %}<span class="pill approved">Cured</span>
+        {% elif record.self_certification == 'NOT_OBTAINED' %}<span class="pill error">Not obtained</span>
+        {% else %}<span class="pill neutral">Not recorded</span>{% endif %}
+      </td>
+      <td class="num">{{ record.controlling_persons.count }}</td>
       <td class="mono">{{ record.account_number }}</td>
-      <td class="num">{{ record.balance }}</td>
+      <td class="num">{{ record.balance|intcomma }} {{ record.currency }}</td>
       <td>
         {% if record.superseded %}<span class="pill neutral">Superseded</span>
         {% elif record.doc_type_indic == 'OECD2' %}<span class="pill correction">OECD2 corrects {{ record.corr_doc_ref_id }}</span>
@@ -90,6 +148,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 
 {% if can_return %}

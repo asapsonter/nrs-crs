@@ -48,9 +48,9 @@ def login_view(request):
                     actor_name="Super Admin",
                     actor_role=Roles.SUPER_ADMIN.label,
                     action="SUPER_ADMIN_LOGIN",
-                    detail="Super Admin signed in to the admin console.",
+                    detail="Super Admin signed in to the Supervision Centre.",
                 )
-                return redirect("/backoffice/admin-console/")
+                return redirect("/backoffice/")
             # A user authenticated by neither route has no place here.
             logout(request)
         # Distinguish refusal reasons for the presenter without weakening the
@@ -93,7 +93,7 @@ def dashboard(request):
     from exchange.services import days_to_exchange_deadline
 
     year = config.CURRENT_REPORTING_YEAR
-    caps = access.capabilities_for(request.credential.role_list)
+    caps = request.caps
     days_left = days_to_exchange_deadline()
     # Each card names the capability that opens its queue. A card the user
     # cannot open stays visible as a figure but is not a link, so the

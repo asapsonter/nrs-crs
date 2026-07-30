@@ -44,6 +44,11 @@ _VIEW_CAPS = {
     VIEW_TAV,
 }
 
+# The standing Super Admin account can open every workspace read-only: it
+# administers access and oversees the centre, but the processing capabilities
+# (act, approve, decide, operate) remain with credentialled officers.
+SUPERADMIN_CAPS = frozenset(_VIEW_CAPS | {VIEW_AUDIT})
+
 ROLE_CAPABILITIES: dict[str, set[str]] = {
     # Full operational access, including final authorisation and the audit log.
     Roles.INTERNAL_ADMIN: _VIEW_CAPS

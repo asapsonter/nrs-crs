@@ -7,11 +7,14 @@ from backoffice import (
     views_registration,
     views_reports,
     views_returns,
+    views_supervision,
 )
 from exchange import views as exchange_views
 
 urlpatterns = [
     path("reports/", views_reports.reports),
+    path("institutions/", views_supervision.institutions),
+    path("compliance/", views_supervision.compliance),
     path("exchange/", exchange_views.workspace),
     path("exchange/build/", exchange_views.build),
     path("exchange/packages/<int:package_id>/", exchange_views.package_detail),
@@ -38,7 +41,8 @@ urlpatterns = [
     path("returns/<int:filing_id>/findings/<int:finding_id>/override/", views_returns.override_warning),
     path("registration/", views_registration.queue),
     path("registration/<int:rfi_id>/", views_registration.detail),
-    path("registration/<int:rfi_id>/review/", views_registration.review),
+    # Retired with the recorded-assessment step (not in the Vizor structure):
+    # path("registration/<int:rfi_id>/review/", views_registration.review),
     path("registration/<int:rfi_id>/decide/", views_registration.decide),
     path("registration/<int:rfi_id>/standing/", views_registration.standing),
     path("login/", views.login_view),

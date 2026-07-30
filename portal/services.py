@@ -86,10 +86,10 @@ def send_rejection_email(rfi: ReportingFI) -> None:
         subject=f"NRS AEOI-CRS Portal: enrolment decision for {rfi.legal_name}",
         message=(
             f"Dear {rfi.pu_name},\n\n"
-            f"The enrolment application of {rfi.legal_name} (reference {rfi.reference}) "
-            f"has been rejected.\n\n"
+            f"The Institution & Primary User Enrolment of {rfi.legal_name} (reference {rfi.reference}) "
+            f"has been declined.\n\n"
             f"Reason: {rfi.rejection_reason}\n\n"
-            f"A new application may be submitted once the matter above is addressed.\n\n"
+            f"A new enrolment may be submitted once the matter above is addressed.\n\n"
             f"Nigeria Revenue Service\nAutomatic Exchange of Information"
         ),
         from_email=None,

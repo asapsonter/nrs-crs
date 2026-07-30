@@ -1,28 +1,48 @@
 {% extends "backoffice/base.html" %}
 {% load pills %}
-{% block title %}{{ rfi.reference }} · Registration{% endblock %}
+{% block title %}{{ rfi.reference }} · Enrolments{% endblock %}
 {% block content %}
 <h1>{{ rfi.legal_name }}</h1>
-<p class="page-sub">{{ rfi.reference }} &middot; {% pill rfi.status rfi.get_status_display %}</p>
+<p class="page-sub">Institution &amp; Primary User Enrolment &middot; {{ rfi.reference }} &middot; {% pill rfi.status rfi.get_status_display %}</p>
 
 <div class="panel">
-  <h2 style="margin-top: 0;">Application</h2>
+  <h2 style="margin-top: 0;">Financial Institution</h2>
   <dl class="kv">
-    <dt>TIN</dt><dd class="mono">{{ rfi.tin }}</dd>
-    <dt>Financial Institution Category</dt><dd>{{ rfi.get_category_display }}</dd>
+    <dt>Financial Institution Name</dt><dd>{{ rfi.legal_name }}</dd>
+    <dt>Identification Number (issued by Tax Authority)</dt><dd class="mono">{{ rfi.tin }}</dd>
+    <dt>CRS Entity Classification</dt><dd>{{ rfi.get_category_display }}</dd>
     <dt>Enrolment type</dt><dd>{{ rfi.get_enrolment_type_display }}</dd>
-    <dt>Registered address</dt><dd>{{ rfi.full_address|default:"Not provided" }}</dd>
+    <dt>Registered Office Address</dt><dd>{{ rfi.full_address|default:"Not provided" }}</dd>
     <dt>Institution email</dt><dd>{{ rfi.email|default:"Not provided" }}</dd>
     <dt>Institution telephone</dt><dd>{{ rfi.full_phone|default:"Not provided" }}</dd>
-    <dt>Primary User</dt><dd>{{ rfi.pu_surname }}, {{ rfi.pu_first_name }} &middot; {{ rfi.pu_designation }}</dd>
-    <dt>PU date of birth</dt><dd>{% if rfi.pu_dob %}{{ rfi.pu_dob|date:"j M Y" }}{% else %}Not provided{% endif %}</dd>
-    <dt>PU email</dt><dd>{{ rfi.pu_email }}</dd>
-    <dt>PU telephone</dt><dd>{{ rfi.pu_full_phone }}</dd>
-    <dt>PU identification</dt><dd>{% if rfi.id_document %}<a href="{{ rfi.id_document.url }}">{{ rfi.id_document.name }}</a>{% else %}Not on file{% endif %}</dd>
-    <dt>CEO letter</dt><dd>{% if rfi.ceo_letter %}<a href="{{ rfi.ceo_letter.url }}">{{ rfi.ceo_letter.name }}</a>{% else %}Not on file{% endif %}</dd>
+    <dt>Reporting Obligations</dt><dd><span class="pill approved">CRS</span></dd>
+  </dl>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top: 0;">Primary User</h2>
+  <dl class="kv">
+    <dt>Name</dt><dd>{{ rfi.pu_surname }}, {{ rfi.pu_first_name }}{% if rfi.pu_middle_name %} {{ rfi.pu_middle_name }}{% endif %}</dd>
+    <dt>Position</dt><dd>{{ rfi.pu_designation }}</dd>
+    <dt>Date of birth</dt><dd>{% if rfi.pu_dob %}{{ rfi.pu_dob|date:"j M Y" }}{% else %}Not provided{% endif %}</dd>
+    <dt>Email</dt><dd>{{ rfi.pu_email }}</dd>
+    <dt>Telephone</dt><dd>{{ rfi.pu_full_phone }}</dd>
+  </dl>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top: 0;">Supporting documents</h2>
+  <dl class="kv">
+    <dt>Passport scan / identification</dt><dd>{% if rfi.id_document %}<a href="{{ rfi.id_document.url }}">{{ rfi.id_document.name }}</a>{% else %}Not on file{% endif %}</dd>
+    <dt>Signed letter</dt><dd>{% if rfi.ceo_letter %}<a href="{{ rfi.ceo_letter.url }}">{{ rfi.ceo_letter.name }}</a>{% else %}Not on file{% endif %}</dd>
     <dt>Submitted</dt><dd>{{ rfi.submitted_at|date:"Y-m-d H:i" }}</dd>
   </dl>
 </div>
+
+{% comment %}
+Retired with the recorded-assessment step, which is not part of the Vizor
+AEOI enrolment structure (the authority approves or declines the submitted
+enrolment form directly). Kept for reference.
 
 {% if rfi.reviewed_at %}
 <div class="panel band">
@@ -39,61 +59,46 @@
 </div>
 {% endif %}
 
-{% if rfi.status == 'REJECTED' %}
-<div class="panel">
-  <h2 style="margin-top: 0;">Decision</h2>
-  <dl class="kv">
-    <dt>Decided by</dt><dd>{{ rfi.decided_by.name|default:"NRS Registration Unit" }} on {{ rfi.decided_at|date:"Y-m-d H:i" }}</dd>
-    <dt>Rejection reason</dt><dd>{{ rfi.rejection_reason }}</dd>
-  </dl>
-</div>
-{% endif %}
-
 {% if can_review %}
 <div class="panel">
   <h2 style="margin-top: 0;">Record assessment</h2>
-  <form method="post" action="/backoffice/registration/{{ rfi.pk }}/review/" class="stacked">
-    {% csrf_token %}
-    <div class="checkbox-row"><input type="checkbox" name="check_tin" id="check_tin" {% if rfi.check_tin %}checked{% endif %}><label for="check_tin" style="margin: 0;">TIN verified against the taxpayer register</label></div>
-    <div class="checkbox-row"><input type="checkbox" name="check_ceo_letter" id="check_ceo_letter" {% if rfi.check_ceo_letter %}checked{% endif %}><label for="check_ceo_letter" style="margin: 0;">CEO letter introducing the PU sighted</label></div>
-    <div class="checkbox-row"><input type="checkbox" name="check_licence" id="check_licence" {% if rfi.check_licence %}checked{% endif %}><label for="check_licence" style="margin: 0;">Regulatory licence confirmed</label></div>
-    <div class="checkbox-row"><input type="checkbox" name="check_classification" id="check_classification" {% if rfi.check_classification %}checked{% endif %}><label for="check_classification" style="margin: 0;">CRS classification confirmed</label></div>
-    <label for="review_notes">Assessment notes</label>
-    <textarea name="review_notes" id="review_notes" rows="4">{{ rfi.review_notes }}</textarea>
-    <label for="recommendation">Recommendation</label>
-    <select name="recommendation" id="recommendation" required>
-      <option value="">Select</option>
-      <option value="APPROVE">Approval</option>
-      <option value="REJECT">Rejection</option>
-    </select>
-    <div class="actions-row">
-      <button type="submit" class="btn">Record assessment</button>
-    </div>
-  </form>
+  ... assessment checklist form ...
+</div>
+{% endif %}
+{% endcomment %}
+
+{% if rfi.status == 'REJECTED' %}
+<div class="panel">
+  <h2 style="margin-top: 0;">Enrolment declined</h2>
+  <dl class="kv">
+    <dt>Declined by</dt><dd>{{ rfi.decided_by.name|default:"NRS AEOI Unit" }} on {{ rfi.decided_at|date:"Y-m-d H:i" }}</dd>
+    <dt>Reason</dt><dd>{{ rfi.rejection_reason }}</dd>
+  </dl>
 </div>
 {% endif %}
 
 {% if awaiting_decision and not can_decide %}
 <div class="panel band decision-gate">
   <h2 style="margin-top: 0;">Awaiting a decision</h2>
-  <p>This application is awaiting acceptance or rejection. Your current role is read-only for enrolments; an <strong>Assistant Admin</strong> or <strong>Internal Admin user</strong> can accept or reject it.</p>
+  <p>This enrolment is awaiting approval. Your current role is read-only for enrolments; an <strong>Assistant Admin</strong> or <strong>Internal Admin user</strong> can approve or decline it.</p>
 </div>
 {% endif %}
 
 {% if can_decide %}
 <div class="panel">
-  <h2 style="margin-top: 0;">Decision</h2>
+  <h2 style="margin-top: 0;">Enrolment decision</h2>
+  <p class="muted">Approving issues Primary User credentials to {{ rfi.pu_email }} by email. Declining notifies the applicant with the reason given.</p>
   <form method="post" action="/backoffice/registration/{{ rfi.pk }}/decide/" class="stacked" id="decide-form">
     {% csrf_token %}
     <div class="actions-row" id="decide-actions">
-      <button type="submit" name="decision" value="approve" class="btn">Approve</button>
-      <button type="button" class="btn ghost" id="reject-toggle">Reject</button>
+      <button type="submit" name="decision" value="approve" class="btn">Approve Enrolment</button>
+      <button type="button" class="btn ghost" id="reject-toggle">Decline Enrolment</button>
     </div>
     <div id="reject-panel" hidden>
-      <label for="rejection_reason">Rejection reason (sent to the applicant)</label>
+      <label for="rejection_reason">Reason for declining (sent to the applicant)</label>
       <textarea name="rejection_reason" id="rejection_reason" rows="3"></textarea>
       <div class="actions-row">
-        <button type="submit" name="decision" value="reject" class="btn ghost">Confirm rejection</button>
+        <button type="submit" name="decision" value="decline" class="btn ghost">Confirm decline</button>
         <button type="button" class="btn secondary" id="reject-cancel">Cancel</button>
       </div>
     </div>
@@ -122,7 +127,7 @@
 
 {% if can_manage_standing %}
 <div class="panel band">
-  <h2 style="margin-top: 0;">Institution standing</h2>
+  <h2 style="margin-top: 0;">Financial Institution status</h2>
   <form method="post" action="/backoffice/registration/{{ rfi.pk }}/standing/">
     {% csrf_token %}
     <div class="actions-row">
@@ -137,5 +142,5 @@
 </div>
 {% endif %}
 
-<div class="back-nav"><a class="btn-back" href="/backoffice/registration/">Back to registration queue</a></div>
+<div class="back-nav"><a class="btn-back" href="/backoffice/registration/">Back to Enrolments</a></div>
 {% endblock %}

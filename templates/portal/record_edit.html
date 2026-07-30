@@ -1,5 +1,5 @@
 {% extends "portal/base.html" %}
-{% load flags %}
+{% load flags humanize %}
 {% block title %}Amend Record · NRS AEOI-CRS Portal{% endblock %}
 {% block content %}
 <h1>{% if filing.status == 'RETURNED' %}Amend flagged record{% else %}Edit record{% endif %}</h1>
@@ -24,11 +24,10 @@
   <label for="holder_type">Holder type</label>
   <select name="holder_type" id="holder_type">
     <option value="INDIVIDUAL" {% if record.holder_type == 'INDIVIDUAL' %}selected{% endif %}>Individual</option>
-    <option value="ORGANISATION" {% if record.holder_type == 'ORGANISATION' %}selected{% endif %}>Organisation</option>
+    <option value="ORGANISATION" {% if record.holder_type == 'ORGANISATION' %}selected{% endif %}>Entity</option>
   </select>
-  <label for="acct_holder_type">Entity account holder type (organisations)</label>
+  <label for="acct_holder_type">Entity account holder type</label>
   <select name="acct_holder_type" id="acct_holder_type">
-    <option value="">Not an entity / not set</option>
     {% for code, label in acct_holder_types %}
     <option value="{{ code }}" {% if record.acct_holder_type == code %}selected{% endif %}>{{ label }}</option>
     {% endfor %}
@@ -106,12 +105,25 @@
   </tbody>
 </table>
 
-<div class="panel band" style="margin-top: 16px;">
+<div class="panel band" style="margin-top: 16px;" id="add-cp">
   <h2 style="margin-top: 0;">Add controlling person</h2>
+  <p class="muted" id="cp-disabled-note" hidden>Controlling person entry is available when the holder is an Organisation with entity account holder type CRS101 (Passive NFE with controlling persons).</p>
   <form method="post" action="/portal/filings/{{ filing.pk }}/records/{{ record.pk }}/cp/add/" class="stacked">
     {% csrf_token %}
-    <label for="cp_name">Name</label>
-    <input type="text" name="cp_name" id="cp_name" required>
+    <div class="name-grid">
+      <div class="field">
+        <label for="cp_surname">Surname</label>
+        <input type="text" name="cp_surname" id="cp_surname" required>
+      </div>
+      <div class="field">
+        <label for="cp_middle_name">Middle name</label>
+        <input type="text" name="cp_middle_name" id="cp_middle_name">
+      </div>
+      <div class="field">
+        <label for="cp_other_names">Other names</label>
+        <input type="text" name="cp_other_names" id="cp_other_names" required>
+      </div>
+    </div>
     <label for="cp_residence">Residence jurisdiction</label>
     <select name="cp_residence" id="cp_residence" class="flag-select" required>
       <option value="">Select jurisdiction</option>
@@ -134,4 +146,8 @@
     <div class="actions-row"><button type="submit" class="btn secondary">Add controlling person</button></div>
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% include "portal/_record_form_rules.html" %}
 {% endblock %}

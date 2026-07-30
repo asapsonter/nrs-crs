@@ -1,0 +1,46 @@
+{% extends "backoffice/base.html" %}
+{% load humanize %}
+{% block title %}Compliance · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Compliance Monitor</h1>
+<p class="page-sub">Filing position of the operational FI community for reporting year {{ year }}. Domestic deadline {{ deadline|date:"j F Y" }}:
+{% if overdue %}<strong>passed {{ overdue_days }} day{{ overdue_days|pluralize }} ago</strong>. Late filing attracts a penalty of &#8358;10,000,000 for the first month and &#8358;1,000,000 for each further month.{% else %}{{ days_left }} day{{ days_left|pluralize }} remaining.{% endif %}
+</p>
+
+<div class="card-grid">
+  <div class="stat-card static"><div class="label">Operational FIs</div><div class="value">{{ total_operational }}</div></div>
+  <div class="stat-card static"><div class="label">Data returns filed</div><div class="value">{{ summary.filed }}</div></div>
+  <div class="stat-card static"><div class="label">Nil returns filed</div><div class="value">{{ summary.nil }}</div></div>
+  <div class="stat-card static"><div class="label">In progress</div><div class="value">{{ summary.in_progress }}</div></div>
+  <div class="stat-card static"><div class="label">Not filed</div><div class="value {% if summary.not_filed %}alert{% endif %}">{{ summary.not_filed }}</div></div>
+</div>
+
+<table class="data" style="margin-top: 16px;">
+  <thead><tr>
+    <th>Institution</th><th>Reference</th><th>Filing position</th>
+    <th>Filings ({{ year }})</th><th>Records filed</th><th>Penalty exposure</th><th></th>
+  </tr></thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.rfi.legal_name }}</td>
+      <td class="mono">{{ row.rfi.reference }}</td>
+      <td>
+        {% if row.key == 'filed' %}<span class="pill approved">{{ row.position }}</span>
+        {% elif row.key == 'nil' %}<span class="pill approved">{{ row.position }}</span>
+        {% elif row.key == 'in_progress' %}<span class="pill review">{{ row.position }}</span>
+        {% else %}<span class="pill error">{{ row.position }}</span>{% endif %}
+      </td>
+      <td class="num">{{ row.filings }}</td>
+      <td class="num">{{ row.records }}</td>
+      <td class="num">
+        {% if row.penalty %}<span class="pill error">&#8358;{{ row.penalty|intcomma }}</span>{% else %}<span class="muted">-</span>{% endif %}
+      </td>
+      <td><a href="/backoffice/registration/{{ row.rfi.pk }}/">Open</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">No operational institutions yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

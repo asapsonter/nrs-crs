@@ -1,5 +1,5 @@
 {% extends "portal/base.html" %}
-{% load pills flags %}
+{% load pills flags humanize %}
 {% block title %}{{ filing.reference }} · NRS AEOI-CRS Portal{% endblock %}
 {% block content %}
 {% include "portal/deadline_banner.html" %}
@@ -22,7 +22,7 @@
 </div>
 
 {% if filing.checker_comment and filing.status == 'DRAFT' %}
-<div class="flash error"><strong>Checker comments:</strong> {{ filing.checker_comment }}</div>
+<div class="flash error"><strong>Comments:</strong> {{ filing.checker_comment }}</div>
 {% endif %}
 
 {% if filing.status == 'RETURNED' %}
@@ -56,7 +56,7 @@
 {% if filing.is_crs_data and filing.kind != 'NIL' %}
 <h2>Account reports</h2>
 <table class="data">
-  <thead><tr><th>DocRefID</th><th>Holder</th><th>Residence</th><th>TIN</th><th>Account</th><th>Balance</th><th>Lineage</th><th></th></tr></thead>
+  <thead><tr><th>DocRefID</th><th>Holder</th><th>Residence</th><th>TIN</th><th>Account Number</th><th>Balance</th><th>Lineage</th><th></th></tr></thead>
   <tbody>
     {% for record in records %}
     <tr {% if record.superseded %}style="opacity: 0.55;"{% endif %}>
@@ -65,7 +65,7 @@
       <td>{{ record.residence_country|flag }}{{ record.residence_country }}</td>
       <td class="mono">{{ record.foreign_tin|default:"-" }}</td>
       <td class="mono">{{ record.account_number }}</td>
-      <td class="num">{{ record.balance }} {{ record.currency }}</td>
+      <td class="num">{{ record.balance|intcomma }} {{ record.currency }}</td>
       <td>
         {% if record.superseded %}<span class="pill neutral">Superseded</span>
         {% elif record.doc_type_indic == 'OECD2' %}<span class="pill correction">OECD2 corrects {{ record.corr_doc_ref_id }}</span>
@@ -118,11 +118,10 @@
     <label for="holder_type">Holder type</label>
     <select name="holder_type" id="holder_type">
       <option value="INDIVIDUAL">Individual</option>
-      <option value="ORGANISATION">Organisation</option>
+      <option value="ORGANISATION">Entity</option>
     </select>
-    <label for="acct_holder_type">Entity account holder type (organisations)</label>
+    <label for="acct_holder_type">Entity account holder type</label>
     <select name="acct_holder_type" id="acct_holder_type">
-      <option value="">Not an entity / not set</option>
       {% for code, label in acct_holder_types %}
       <option value="{{ code }}">{{ label }}</option>
       {% endfor %}
@@ -174,35 +173,25 @@
 {% endif %}
 
 <div class="actions-row">
-  {% if can_stage %}
-  <form method="post" action="/portal/filings/{{ filing.pk }}/stage/">
+  {% if can_submit %}
+  <form method="post" action="/portal/filings/{{ filing.pk }}/stage/"
+        onsubmit="return confirm('Submit {{ filing.reference }} to the NRS?');">
     {% csrf_token %}
-    <button type="submit" class="btn">Send to Checker</button>
+    <button type="submit" class="btn">Submit to NRS</button>
   </form>
   {% endif %}
   {% if can_resubmit %}
-  <form method="post" action="/portal/filings/{{ filing.pk }}/resubmit/">
+  <form method="post" action="/portal/filings/{{ filing.pk }}/resubmit/"
+        onsubmit="return confirm('Resubmit the corrected filing to the NRS?');">
     {% csrf_token %}
-    <button type="submit" class="btn">Stage corrections for Checker</button>
+    <button type="submit" class="btn">Resubmit corrections to NRS</button>
   </form>
   {% endif %}
 </div>
 
-{% if can_check %}
-<div class="panel">
-  <h2 style="margin-top: 0;">Checker action</h2>
-  <p class="muted">Review the staged records. Submission transmits the filing to the NRS. A Checker cannot edit records, only approve, reject back with comments, or submit.</p>
-  <form method="post" action="/portal/filings/{{ filing.pk }}/check/" class="stacked">
-    {% csrf_token %}
-    <label for="comment">Comments (required when rejecting back to the Maker)</label>
-    <textarea name="comment" id="comment" rows="3"></textarea>
-    <div class="actions-row">
-      <button type="submit" name="action" value="submit" class="btn">Submit to NRS</button>
-      <button type="submit" name="action" value="reject" class="btn ghost">Reject back to Maker</button>
-    </div>
-  </form>
-</div>
-{% endif %}
-
 <div class="back-nav"><a class="btn-back" href="/portal/filings/">Back to filings</a></div>
+{% endblock %}
+
+{% block scripts %}
+{% include "portal/_record_form_rules.html" %}
 {% endblock %}

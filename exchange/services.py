@@ -32,6 +32,30 @@ def days_to_exchange_deadline(year: int | None = None) -> int:
     return (exchange_deadline(year) - timezone.localdate()).days
 
 
+def late_filing_penalty(deadline: datetime.date, today: datetime.date | None = None) -> int:
+    """Administrative penalty for a return not filed by the deadline.
+
+    Per the CRS Regulations 2019 penalty regime: N10,000,000 for the first
+    month of default and N1,000,000 for each subsequent month (any part of a
+    month counts as a month). Returns 0 when the deadline has not passed.
+    """
+    today = today or timezone.localdate()
+    if today <= deadline:
+        return 0
+    months = 0
+    marker = deadline
+    while marker < today:
+        months += 1
+        # Advance one calendar month, clamping the day to the month end.
+        month = marker.month % 12 + 1
+        year = marker.year + (1 if marker.month == 12 else 0)
+        try:
+            marker = marker.replace(year=year, month=month)
+        except ValueError:
+            marker = datetime.date(year, month, 28)
+    return 10_000_000 + (months - 1) * 1_000_000
+
+
 def next_message_ref_id(jurisdiction_code: str, year: int) -> str:
     """Build a MessageRefID: sending country + year + receiving country + id.
 

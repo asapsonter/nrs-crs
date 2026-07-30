@@ -62,7 +62,7 @@ def documents(request):
     rfi = profile.rfi
     docs = []
     if rfi.ceo_letter:
-        docs.append({"name": "CEO letter clearance form", "category": "Enrolment", "file": rfi.ceo_letter})
+        docs.append({"name": "Letter of Authorisation", "category": "Enrolment", "file": rfi.ceo_letter})
     if rfi.id_document:
         docs.append({"name": "Primary User identification", "category": "Enrolment", "file": rfi.id_document})
     uploads = rfi.filings.exclude(uploaded_filename="").order_by("-created_at")

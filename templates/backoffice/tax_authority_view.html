@@ -1,5 +1,5 @@
 {% extends "backoffice/base.html" %}
-{% load flags %}
+{% load flags humanize %}
 {% block title %}Tax Authority View · NRS Supervision Centre{% endblock %}
 {% block content %}
 <h1>Tax Authority View</h1>
@@ -14,7 +14,7 @@
 {% endif %}
 
 <table class="data">
-  <thead><tr><th>Review track</th><th>Matched taxpayer</th><th>NG TIN</th><th>From</th><th>DocRefID</th><th>Account</th><th>Balance</th></tr></thead>
+  <thead><tr><th>Review track</th><th>Matched taxpayer</th><th>NG TIN</th><th>From</th><th>DocRefID</th><th>Account Number</th><th>Balance</th></tr></thead>
   <tbody>
     {% for record in records %}
     <tr>
@@ -24,7 +24,7 @@
       <td>{% country record.file.jurisdiction.code record.file.jurisdiction.name %}</td>
       <td class="mono">{{ record.doc_ref_id }}</td>
       <td class="mono">{{ record.account_number }}</td>
-      <td class="num">{{ record.balance }} {{ record.currency }}</td>
+      <td class="num">{{ record.balance|intcomma }} {{ record.currency }}</td>
     </tr>
     {% empty %}
     <tr><td colspan="7" class="muted">No disseminated records yet.</td></tr>

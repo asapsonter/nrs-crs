@@ -1,5 +1,5 @@
 {% extends "backoffice/base.html" %}
-{% load pills flags %}
+{% load pills flags humanize %}
 {% block title %}{{ package.message_ref_id }} · Exchange{% endblock %}
 {% block content %}
 <h1 class="mono">{{ package.message_ref_id }}</h1>
@@ -90,7 +90,7 @@
           <td>{{ record.filing.rfi.legal_name }}</td>
           <td>{{ record.holder_name }}</td>
           <td class="mono">{{ record.foreign_tin|default:"-" }}</td>
-          <td class="num">{{ record.balance }}</td>
+          <td class="num">{{ record.balance|intcomma }}</td>
           <td>{% if record.doc_type_indic != 'OECD1' %}<span class="pill correction">{{ record.doc_type_indic }} corrects {{ record.corr_doc_ref_id }}</span>{% else %}<span class="muted">OECD1</span>{% endif %}</td>
         </tr>
         {% endfor %}
@@ -110,7 +110,7 @@
       <td>{{ record.holder_name }}</td>
       <td>{{ record.residence_country|flag }}{{ record.residence_country }}</td>
       <td class="mono">{{ record.foreign_tin|default:"-" }}</td>
-      <td class="num">{{ record.balance }}</td>
+      <td class="num">{{ record.balance|intcomma }}</td>
       <td>{% if record.doc_type_indic != 'OECD1' %}<span class="pill correction">{{ record.doc_type_indic }} corrects {{ record.corr_doc_ref_id }}</span>{% else %}<span class="muted">OECD1</span>{% endif %}</td>
     </tr>
     {% endfor %}

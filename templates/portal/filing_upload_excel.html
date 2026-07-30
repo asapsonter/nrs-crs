@@ -1,0 +1,43 @@
+{% extends "portal/base.html" %}
+{% block title %}CRS Excel Upload · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+{% include "portal/deadline_banner.html" %}
+<h1>CRS Excel Upload Filing</h1>
+<p class="page-sub">Upload a CRS filing prepared in the Excel template (.xlsx), or the same template saved as a .csv file. Each row is one reportable account; the file is validated on upload before any records are created.</p>
+
+{% if errors %}
+<div class="error-text">
+  {% for error in errors %}{{ error }}<br>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="stacked">
+  {% csrf_token %}
+  <label for="crs_file">CRS filing template (.xlsx or .csv)</label>
+  <input type="file" name="crs_file" id="crs_file" accept=".xlsx,.csv" required>
+  <div class="actions-row"><button type="submit" class="btn">Upload and validate</button></div>
+</form>
+
+<div class="panel band" style="margin-top: 24px;">
+  <h2 style="margin-top: 0;">Template columns</h2>
+  <p class="muted">The first row of the file must be a header row using these column names. Required columns are marked <span class="req-star">*</span>.</p>
+  <table class="data">
+    <thead><tr><th>Column</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">HolderName <span class="req-star">*</span></td><td>Account holder full name or entity name.</td></tr>
+      <tr><td class="mono">HolderType</td><td>INDIVIDUAL (default) or ORGANISATION (entity).</td></tr>
+      <tr><td class="mono">AcctHolderType</td><td>Entity holders only: CRS101 (default), CRS102 or CRS103. Leave blank for individuals.</td></tr>
+      <tr><td class="mono">ResidenceCountry <span class="req-star">*</span></td><td>2-letter ISO code of the tax residence jurisdiction.</td></tr>
+      <tr><td class="mono">TIN / TINMissingReason</td><td>Provide the TIN, or a reason it is unavailable.</td></tr>
+      <tr><td class="mono">Address <span class="req-star">*</span> / AddressCountry</td><td>Account holder address; country defaults to the residence jurisdiction.</td></tr>
+      <tr><td class="mono">BirthDate</td><td>Individuals only, YYYY-MM-DD.</td></tr>
+      <tr><td class="mono">SelfCertification</td><td>OBTAINED, CURED or NOT_OBTAINED.</td></tr>
+      <tr><td class="mono">AccountNumber <span class="req-star">*</span> / Currency <span class="req-star">*</span></td><td>Account identifier and ISO currency code.</td></tr>
+      <tr><td class="mono">Balance, Dividends, Interest, GrossProceeds, OtherIncome</td><td>Amounts in the account currency; default 0.</td></tr>
+      <tr><td class="mono">CPName, CPResidence, CPTIN, CPType</td><td>Optional controlling person, only for AcctHolderType CRS101 rows. CPType is CRS801 to CRS813.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="back-nav"><a class="btn-back" href="/portal/filings/create/">Back to Create Filing</a></div>
+{% endblock %}

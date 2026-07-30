@@ -2,12 +2,18 @@
 from __future__ import annotations
 
 from core import config
-from core.access import capabilities_for
+from core.access import SUPERADMIN_CAPS, capabilities_for
 
 
 def surface_context(request) -> dict:
     credential = getattr(request, "credential", None)
-    caps = capabilities_for(credential.role_list) if credential else set()
+    user = getattr(request, "user", None)
+    if credential:
+        caps = capabilities_for(credential.role_list)
+    elif user is not None and user.is_authenticated and user.is_superuser:
+        caps = set(SUPERADMIN_CAPS)
+    else:
+        caps = set()
     return {
         "surface": getattr(request, "surface", "public"),
         "credential": credential,

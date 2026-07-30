@@ -5,7 +5,7 @@
 <p class="page-sub">Internal user register. A user may hold several roles; access is the union of those roles. Users hold no standing passwords; access is by credential issued from the admin console.</p>
 
 <table class="data">
-  <thead><tr><th>Name</th><th>Roles</th><th>Email</th><th>Credentials</th><th></th></tr></thead>
+  <thead><tr><th>Name</th><th>Roles</th><th>Email</th><th>Phone</th><th>Credentials</th><th></th></tr></thead>
   <tbody>
     {% for officer in officers %}
     <tr>
@@ -14,11 +14,12 @@
         {% for label in officer.role_labels %}<span class="pill neutral">{{ label }}</span> {% empty %}<span class="muted">No roles</span>{% endfor %}
       </td>
       <td>{{ officer.email }}</td>
+      <td>{{ officer.phone|default:"-" }}</td>
       <td class="num">{{ officer.credentials.count }}</td>
       <td><a href="/backoffice/admin-console/officers/{{ officer.pk }}/">Manage</a></td>
     </tr>
     {% empty %}
-    <tr><td colspan="5" class="muted">No users yet. Create the first one below.</td></tr>
+    <tr><td colspan="6" class="muted">No users yet. Create the first one below.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -27,10 +28,24 @@
   <h2 style="margin-top: 0;">Create user</h2>
   <form method="post" class="stacked">
     {% csrf_token %}
-    <label for="name">Full name</label>
-    <input type="text" name="name" id="name" required>
-    <label for="email">Email</label>
+    <div class="name-grid">
+      <div class="field">
+        <label for="surname">Surname</label>
+        <input type="text" name="surname" id="surname" required>
+      </div>
+      <div class="field">
+        <label for="middle_name">Middle name</label>
+        <input type="text" name="middle_name" id="middle_name">
+      </div>
+      <div class="field">
+        <label for="other_names">Other names</label>
+        <input type="text" name="other_names" id="other_names" required>
+      </div>
+    </div>
+    <label for="email">Email (used to sign in)</label>
     <input type="email" name="email" id="email" required>
+    <label for="phone">Phone number</label>
+    <input type="text" name="phone" id="phone" placeholder="+234 800 000 0000" required>
     <label>Roles (select one or more)</label>
     {% for value, label in role_choices %}
     <div class="checkbox-row">

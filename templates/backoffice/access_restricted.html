@@ -1,0 +1,19 @@
+{% extends "backoffice/base.html" %}
+{% block title %}Access restricted · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Access restricted</h1>
+<p class="page-sub">You are signed in, but this page is not available to your current access.</p>
+
+<div class="panel">
+  <p>{{ reason }}</p>
+  {% if hint %}<p class="muted">{{ hint }}</p>{% endif %}
+  <div class="actions-row">
+    {% if user.is_superuser %}
+    <a class="btn" href="/backoffice/admin-console/">Go to Admin Console</a>
+    {% else %}
+    <a class="btn" href="/backoffice/">Go to Dashboard</a>
+    {% endif %}
+    <a class="btn secondary" href="/backoffice/logout/">End session</a>
+  </div>
+</div>
+{% endblock %}

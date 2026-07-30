@@ -10,7 +10,8 @@
   <dl class="kv">
     <dt>User</dt><dd>{{ issued.0.officer.name }}</dd>
     <dt>Roles</dt><dd>{{ issued.0.role_display }}</dd>
-    <dt>Username</dt><dd class="mono">{{ issued.0.username }}</dd>
+    <dt>Sign-in email</dt><dd class="mono">{{ issued.0.officer.email }}</dd>
+    <dt>Credential reference</dt><dd class="mono">{{ issued.0.username }}</dd>
     <dt>Passcode</dt><dd class="mono"><strong>{{ issued.1 }}</strong></dd>
     <dt>Session window</dt><dd>{{ issued.0.session_hours }} hours from first use</dd>
     <dt>Valid for first use until</dt><dd>{{ issued.0.expires_if_unused_at|date:"Y-m-d H:i" }}</dd>

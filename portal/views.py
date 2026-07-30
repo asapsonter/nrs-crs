@@ -36,7 +36,7 @@ def login_view(request):
         elif profile.is_locked:
             error = "This account is locked after repeated failed sign in attempts. Contact the NRS AEOI desk."
         elif profile.status == PortalUser.Status.PENDING:
-            error = "Your registration is awaiting Checker approval within your institution."
+            error = "Your account is awaiting activation by your institution's Primary User."
         elif profile.status == PortalUser.Status.DISABLED:
             error = "This account has been disabled."
         elif not profile.rfi.is_operational:
@@ -141,51 +141,54 @@ def home(request):
 
 @portal_required
 def users(request):
-    """Checker administration: invite users, approve Maker registrations.
+    """Primary User administration: create Secondary User accounts.
 
-    Restricted to Checkers. A Maker who reaches this URL is sent back to the
-    portal home with an explanation rather than a bare 404.
+    Restricted to the Primary User, per the Vizor AEOI convention that the
+    Primary User administers the institution's access. A Secondary User who
+    reaches this URL is sent back to the portal home with an explanation.
     """
     profile = request.portal_profile
     if profile.role != PortalUser.Role.CHECKER:
         messages.info(
             request,
-            "Managing users is available to the Primary User and other Checkers. "
-            "Ask a Checker at your institution to add or approve users.",
+            "Managing users is available to the Primary User. "
+            "Ask your Primary User to add or manage Secondary Users.",
         )
         return redirect("/portal/")
     rfi = profile.rfi
     if request.method == "POST":
         action = request.POST.get("action", "")
         if action == "invite":
-            name = request.POST.get("name", "").strip()
+            surname = request.POST.get("surname", "").strip()
+            middle_name = request.POST.get("middle_name", "").strip()
+            other_names = request.POST.get("other_names", "").strip()
+            # Display name in natural order: other names, middle name, surname.
+            name = " ".join(part for part in [other_names, middle_name, surname] if part)
             email = request.POST.get("email", "").strip().lower()
             designation = request.POST.get("designation", "").strip()
-            role = request.POST.get("role", PortalUser.Role.MAKER)
-            if not name or not email or role not in PortalUser.Role.values:
-                messages.error(request, "Name, email, and role are required.")
+            if not surname or not other_names or not email:
+                messages.error(request, "Surname, other names, and email are required.")
             elif User.objects.filter(username=email).exists():
                 messages.error(request, "A portal account with that email already exists.")
             else:
-                # Maker registrations require Checker approval; a Checker
-                # invited by the PU is active immediately.
-                status = PortalUser.Status.PENDING if role == PortalUser.Role.MAKER else PortalUser.Status.ACTIVE
+                # Secondary Users created by the Primary User are active
+                # immediately; both file and submit directly.
                 new_profile, temp_password = provision_portal_user(
-                    rfi, name=name, email=email, designation=designation, role=role, status=status
+                    rfi,
+                    name=name,
+                    email=email,
+                    designation=designation,
+                    role=PortalUser.Role.MAKER,
+                    status=PortalUser.Status.ACTIVE,
                 )
                 send_mail(
                     subject=f"NRS AEOI-CRS Portal: account created for {rfi.legal_name}",
                     message=(
-                        f"Dear {name},\n\nAn account has been created for you on the NRS AEOI-CRS Portal "
-                        f"by {profile.display_name} ({rfi.legal_name}).\n\n"
-                        f"Role: {new_profile.get_role_display()}\n"
+                        f"Dear {name},\n\nA Secondary User account has been created for you on the "
+                        f"NRS AEOI-CRS Portal by {profile.display_name} ({rfi.legal_name}).\n\n"
                         f"Email: {email}\nTemporary password: {temp_password}\n\n"
-                        + (
-                            "Your registration takes effect once approved by a Checker.\n\n"
-                            if status == PortalUser.Status.PENDING
-                            else ""
-                        )
-                        + "You will be required to set a new password at first sign in.\n\n"
+                        "You can prepare and submit CRS filings for your institution.\n"
+                        "You will be required to set a new password at first sign in.\n\n"
                         "Nigeria Revenue Service\nAutomatic Exchange of Information"
                     ),
                     from_email=None,
@@ -196,10 +199,12 @@ def users(request):
                     surface="portal",
                     action="PORTAL_USER_INVITED",
                     target=email,
-                    detail=f"{new_profile.get_role_display()} invited at {rfi.legal_name}. Status {status}.",
+                    detail=f"Secondary User created at {rfi.legal_name}.",
                 )
-                messages.success(request, f"{new_profile.get_role_display()} account created. Credentials sent by email.")
+                messages.success(request, "Secondary User account created. Credentials sent by email.")
         elif action == "approve":
+            # Legacy path: activate an account left pending under the retired
+            # maker-checker flow.
             pending = get_object_or_404(
                 PortalUser, pk=request.POST.get("user_id"), rfi=rfi, status=PortalUser.Status.PENDING
             )
@@ -208,13 +213,13 @@ def users(request):
             AuditLog.record(
                 actor_name=profile.display_name,
                 surface="portal",
-                action="PORTAL_MAKER_APPROVED",
+                action="PORTAL_USER_ACTIVATED",
                 target=pending.user.username,
                 before_state=PortalUser.Status.PENDING,
                 after_state=PortalUser.Status.ACTIVE,
-                detail=f"Maker registration approved by Checker at {rfi.legal_name}.",
+                detail=f"Pending account activated by the Primary User at {rfi.legal_name}.",
             )
-            messages.success(request, f"{pending.display_name} approved as Maker.")
+            messages.success(request, f"{pending.display_name} activated.")
         return redirect("/portal/users/")
     return render(
         request,

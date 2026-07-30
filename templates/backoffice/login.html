@@ -38,12 +38,12 @@
         <span>AEOI-CRS Supervision Centre</span>
       </div>
       <h2>Officer sign in</h2>
-      <p class="auth-sub">Enter the credential issued to you by the administrator.</p>
+      <p class="auth-sub">Sign in with your registered email and the passcode issued to you by the administrator.</p>
       {% if error %}<div class="error-text">{{ error }}</div>{% endif %}
       <form method="post" class="stacked">
         {% csrf_token %}
-        <label for="username">Credential username</label>
-        <input type="text" id="username" name="username" autocomplete="off" placeholder="nrs-xxx-XXXXX" autofocus required>
+        <label for="username">Registered email</label>
+        <input type="text" id="username" name="username" autocomplete="off" placeholder="name@nrs.gov.ng" autofocus required>
         <label for="passcode">Passcode</label>
         <input type="password" id="passcode" name="passcode" autocomplete="off" placeholder="XXXX-XXXX-XXXX" required>
         <button type="submit" class="btn block">Sign in</button>

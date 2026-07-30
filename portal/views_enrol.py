@@ -25,7 +25,7 @@ REQUIRED_FIELDS: list[tuple[str, str]] = [
     ("State or province", "state_province"),
     ("Post code", "post_code"),
     ("Primary User surname", "pu_surname"),
-    ("Primary User first name", "pu_first_name"),
+    ("Primary User other names", "pu_first_name"),
     ("Date of birth", "pu_dob"),
     ("Primary User position", "pu_designation"),
     ("Primary User email", "pu_email"),
@@ -55,6 +55,7 @@ def enrol(request):
             "state_province": request.POST.get("state_province", "").strip(),
             "post_code": request.POST.get("post_code", "").strip(),
             "pu_surname": request.POST.get("pu_surname", "").strip(),
+            "pu_middle_name": request.POST.get("pu_middle_name", "").strip(),
             "pu_first_name": request.POST.get("pu_first_name", "").strip(),
             "pu_dob": parse_date(request.POST.get("pu_dob", "").strip() or "") or None,
             "pu_designation": request.POST.get("pu_designation", "").strip(),
@@ -92,9 +93,9 @@ def enrol(request):
 
         ceo_letter = request.FILES.get("ceo_letter")
         if ceo_letter is None:
-            errors.append("The CEO letter clearance form is required.")
+            errors.append("The Letter of Authorisation is required.")
         elif not ceo_letter.name.lower().endswith(".pdf"):
-            errors.append("The CEO letter clearance form must be a PDF document.")
+            errors.append("The Letter of Authorisation must be a PDF document.")
 
         if ReportingFI.objects.filter(tin=fields["tin"]).exclude(status=ReportingFI.Status.REJECTED).exists():
             errors.append("An application or enrolment already exists for this TIN.")

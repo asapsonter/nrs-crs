@@ -17,6 +17,7 @@ urlpatterns = [
     path("filings/<int:filing_id>/view/", views_filing.filing_view),
     path("filings/new/", views_filing.filing_new_manual),
     path("filings/upload/", views_filing.filing_upload),
+    path("filings/upload/excel/", views_filing.filing_upload_excel),
     path("filings/nil/", views_filing.filing_nil),
     path("filings/<int:filing_id>/", views_filing.filing_detail),
     path("filings/<int:filing_id>/delete/", views_filing.filing_delete),
@@ -27,7 +28,8 @@ urlpatterns = [
     path("filings/<int:filing_id>/records/<int:record_id>/cp/add/", views_filing.controlling_person_add),
     path("filings/<int:filing_id>/records/<int:record_id>/cp/<int:cp_id>/delete/", views_filing.controlling_person_delete),
     path("filings/<int:filing_id>/stage/", views_filing.filing_stage),
-    path("filings/<int:filing_id>/check/", views_filing.filing_check),
+    # Retired with the maker-checker review step:
+    # path("filings/<int:filing_id>/check/", views_filing.filing_check),
     path("filings/<int:filing_id>/resubmit/", views_filing.filing_resubmit),
     path("enrol/", views_enrol.enrol),
     path("enrol/status/", views_enrol.enrol_status),

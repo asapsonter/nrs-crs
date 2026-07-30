@@ -12,12 +12,14 @@ from core.models import OfficerProfile
 
 
 class ReportingFI(models.Model):
-    """An RFI and its enrolment application.
+    """An RFI and its Institution & Primary User Enrolment.
 
-    The enrolment state machine follows competent authority practice:
-    Draft > Submitted > Under Review > Approved or Rejected > Active >
-    Suspended or Deactivated. Approval is four-eyes: a Registration Officer
-    reviews and recommends, a Registration Supervisor decides.
+    The enrolment state machine follows AEOI portal practice: Submitted >
+    Approved or Declined > Active > Suspended or Deactivated. The authority
+    reviews the submitted enrolment form and approves or declines it; on
+    approval the Primary User receives credentials by email. (The Under
+    Review state and assessment fields remain from the retired recorded-
+    assessment flow.)
     """
 
     class Status(models.TextChoices):
@@ -25,7 +27,7 @@ class ReportingFI(models.Model):
         SUBMITTED = "SUBMITTED", "Submitted"
         UNDER_REVIEW = "UNDER_REVIEW", "Under Review"
         APPROVED = "APPROVED", "Approved"
-        REJECTED = "REJECTED", "Rejected"
+        REJECTED = "REJECTED", "Declined"
         ACTIVE = "ACTIVE", "Active"
         SUSPENDED = "SUSPENDED", "Suspended"
         DEACTIVATED = "DEACTIVATED", "Deactivated"
@@ -53,10 +55,13 @@ class ReportingFI(models.Model):
     phone = models.CharField("Financial Institution phone", max_length=30, blank=True, default="")
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.SUBMITTED)
 
-    # Primary User. Name is captured as surname and first name. For a
-    # stakeholder or individual enrolment this is the natural person enrolling.
+    # Primary User. Name is captured as surname, middle name, and other
+    # names. For a stakeholder or individual enrolment this is the natural
+    # person enrolling. (pu_first_name holds the other names; the column name
+    # is retained for data continuity.)
     pu_surname = models.CharField("Primary User surname", max_length=80, blank=True, default="")
-    pu_first_name = models.CharField("Primary User first name", max_length=80, blank=True, default="")
+    pu_middle_name = models.CharField("Primary User middle name", max_length=80, blank=True, default="")
+    pu_first_name = models.CharField("Primary User other names", max_length=80, blank=True, default="")
     pu_dob = models.DateField("Date of birth", null=True, blank=True)
     pu_designation = models.CharField("Primary User position", max_length=120)
     pu_email = models.EmailField("Primary User email")
@@ -99,8 +104,9 @@ class ReportingFI(models.Model):
 
     @property
     def pu_name(self) -> str:
-        """Primary User full name, first name then surname."""
-        return f"{self.pu_first_name} {self.pu_surname}".strip()
+        """Primary User full name: other names, middle name, then surname."""
+        parts = [self.pu_first_name, self.pu_middle_name, self.pu_surname]
+        return " ".join(part for part in parts if part).strip()
 
     @property
     def full_phone(self) -> str:
@@ -146,18 +152,20 @@ class EnrolmentStatusEvent(models.Model):
 
 
 class PortalUser(models.Model):
-    """A portal account within an approved RFI, holding Maker or Checker duty.
+    """A portal account within an approved RFI: Primary or Secondary User.
 
-    The Primary User is the first Checker. Makers prepare filings; Checkers
-    review and submit them. Maker registrations require Checker approval.
+    Vizor AEOI convention: the Primary User is created at enrolment approval
+    and administers the institution's access, creating Secondary Users. Both
+    prepare and submit filings directly; there is no maker-checker review
+    step. (Role values retain their legacy codes for data continuity.)
     """
 
     class Role(models.TextChoices):
-        MAKER = "MAKER", "Maker"
-        CHECKER = "CHECKER", "Checker"
+        MAKER = "MAKER", "Secondary User"
+        CHECKER = "CHECKER", "Primary User"
 
     class Status(models.TextChoices):
-        PENDING = "PENDING", "Pending Checker approval"
+        PENDING = "PENDING", "Pending approval"
         ACTIVE = "ACTIVE", "Active"
         DISABLED = "DISABLED", "Disabled"
 
@@ -184,21 +192,22 @@ class Filing(models.Model):
     """A CRS filing by an RFI for a reporting year.
 
     Message types follow the CRS schema: CRS701 new data, CRS702 corrections,
-    CRS703 nil return. The maker and checker split is enforced in views: a
-    Maker stages, a Checker submits.
+    CRS703 nil return. Any portal user (Primary or Secondary) prepares and
+    submits filings directly; there is no maker-checker review step.
     """
 
     class Kind(models.TextChoices):
         XML_UPLOAD = "XML_UPLOAD", "CRS XML upload Filing"
+        EXCEL_UPLOAD = "EXCEL_UPLOAD", "CRS Excel Upload Filing"
         MANUAL = "MANUAL", "CRS Manual Entry Filing"
         NIL = "NIL", "Nil return"
         PU_CHANGE = "PU_CHANGE", "Primary User Change Notice"
         ENTITY_DEACTIVATION = "ENTITY_DEACTIVATION", "Reporting Entity Deactivation"
         ENTITY_INFO_CHANGE = "ENTITY_INFO_CHANGE", "Change of reporting entity information"
 
-    # The three CRS data filing kinds carry account reports and a CRS message
+    # The CRS data filing kinds carry account reports and a CRS message
     # type; the remaining kinds are administrative notices.
-    CRS_DATA_KINDS = (Kind.XML_UPLOAD, Kind.MANUAL, Kind.NIL)
+    CRS_DATA_KINDS = (Kind.XML_UPLOAD, Kind.EXCEL_UPLOAD, Kind.MANUAL, Kind.NIL)
     NOTICE_KINDS = (Kind.PU_CHANGE, Kind.ENTITY_DEACTIVATION, Kind.ENTITY_INFO_CHANGE)
 
     class MessageType(models.TextChoices):
@@ -208,7 +217,7 @@ class Filing(models.Model):
 
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
-        PENDING_CHECKER = "PENDING_CHECKER", "Pending Checker"
+        PENDING_CHECKER = "PENDING_CHECKER", "Pending Submission"
         SUBMITTED = "SUBMITTED", "Submitted"
         UNDER_VALIDATION = "UNDER_VALIDATION", "Under Validation"
         RETURNED = "RETURNED", "Returned for Correction"
@@ -281,7 +290,7 @@ class Filing(models.Model):
         """A short workflow category shown in the draft filing list."""
         return {
             self.Status.DRAFT: "Waiting",
-            self.Status.PENDING_CHECKER: "Awaiting Checker",
+            self.Status.PENDING_CHECKER: "Awaiting submission",
             self.Status.RETURNED: "Correction",
         }.get(self.status, self.get_status_display())
 
@@ -333,7 +342,7 @@ class AccountReport(models.Model):
     holder_name = models.CharField("Account holder name", max_length=200)
     holder_type = models.CharField(
         max_length=12,
-        choices=[("INDIVIDUAL", "Individual"), ("ORGANISATION", "Organisation")],
+        choices=[("INDIVIDUAL", "Individual"), ("ORGANISATION", "Entity")],
         default="INDIVIDUAL",
     )
     # Entity account-holder type (Organisation holders); blank for individuals.
@@ -395,6 +404,29 @@ class AccountReport(models.Model):
     def address_country_code(self) -> str:
         """Address country, falling back to residence for the CRS Address."""
         return self.address_country or self.residence_country
+
+    @property
+    def is_complete(self) -> bool:
+        """Whether this Account Information form is complete (Validated).
+
+        Mirrors the per-form validation a Vizor-style AEOI portal applies
+        before a filing becomes Ready to Submit: identity, mandatory address,
+        self-certification, a TIN or a reason it is unavailable, and, for a
+        Passive NFE (CRS101), at least one controlling person.
+        """
+        if not (
+            self.holder_name.strip()
+            and self.account_number.strip()
+            and self.residence_country.strip()
+            and self.holder_address.strip()
+            and self.self_certification
+        ):
+            return False
+        if not self.foreign_tin.strip() and not self.tin_unavailable_reason.strip():
+            return False
+        if self.requires_controlling_persons and not self.controlling_persons.exists():
+            return False
+        return True
 
 
 class ControllingPerson(models.Model):

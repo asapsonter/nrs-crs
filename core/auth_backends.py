@@ -14,14 +14,36 @@ from core.models import AuditLog, IssuedCredential
 
 
 class IssuedCredentialBackend(BaseBackend):
-    """Authenticates backoffice credential usernames of the form nrs-xxx-YYYYY."""
+    """Authenticates backoffice credentials.
+
+    Officers sign in with their registered email (preferred) or the legacy
+    credential username. An email resolves to the officer's newest credential
+    that is still usable (issued or active).
+    """
 
     def authenticate(self, request, username: str | None = None, password: str | None = None, **kwargs):
-        if not username or not username.startswith("nrs-") or password is None:
+        if not username or password is None:
             return None
-        try:
-            credential = IssuedCredential.objects.select_related("officer").get(username=username)
-        except IssuedCredential.DoesNotExist:
+        username = username.strip()
+        if username.startswith("nrs-"):
+            try:
+                credential = IssuedCredential.objects.select_related("officer").get(username=username)
+            except IssuedCredential.DoesNotExist:
+                return None
+        elif "@" in username:
+            # Registered email: the officer's newest usable credential.
+            credential = (
+                IssuedCredential.objects.select_related("officer")
+                .filter(
+                    officer__email__iexact=username,
+                    status__in=[IssuedCredential.Status.ISSUED, IssuedCredential.Status.ACTIVE],
+                )
+                .order_by("-issued_at")
+                .first()
+            )
+            if credential is None:
+                return None
+        else:
             return None
 
         credential.lapse_if_unused()

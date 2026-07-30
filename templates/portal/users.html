@@ -4,7 +4,7 @@
 {% block content %}
 {% include "portal/deadline_banner.html" %}
 <h1>Portal users</h1>
-<p class="page-sub">{{ rfi.legal_name }}. Makers prepare filings; Checkers review and submit. Maker registrations take effect once approved by a Checker.</p>
+<p class="page-sub">{{ rfi.legal_name }}. The Primary User administers the institution's access and creates Secondary Users. Both prepare and submit CRS filings directly.</p>
 
 <table class="data">
   <thead><tr><th>Name</th><th>Designation</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
@@ -22,7 +22,7 @@
           {% csrf_token %}
           <input type="hidden" name="action" value="approve">
           <input type="hidden" name="user_id" value="{{ portal_user.pk }}">
-          <button type="submit" class="btn small">Approve registration</button>
+          <button type="submit" class="btn small">Activate account</button>
         </form>
         {% endif %}
       </td>
@@ -32,23 +32,30 @@
 </table>
 
 <div class="panel band mt">
-  <h2 style="margin-top: 0;">Invite a user</h2>
+  <h2 style="margin-top: 0;">Create a Secondary User</h2>
+  <p class="muted">Secondary Users are active immediately and can prepare and submit filings for {{ rfi.legal_name }}.</p>
   <form method="post" class="stacked">
     {% csrf_token %}
     <input type="hidden" name="action" value="invite">
-    <label for="name">Full name</label>
-    <input type="text" name="name" id="name" required>
+    <div class="name-grid">
+      <div class="field">
+        <label for="surname">Surname</label>
+        <input type="text" name="surname" id="surname" required>
+      </div>
+      <div class="field">
+        <label for="middle_name">Middle name</label>
+        <input type="text" name="middle_name" id="middle_name">
+      </div>
+      <div class="field">
+        <label for="other_names">Other names</label>
+        <input type="text" name="other_names" id="other_names" required>
+      </div>
+    </div>
     <label for="designation">Designation</label>
     <input type="text" name="designation" id="designation">
     <label for="email">Email</label>
     <input type="email" name="email" id="email" required>
-    <label for="role">Role</label>
-    <select name="role" id="role">
-      {% for value, label in role_choices %}
-      <option value="{{ value }}">{{ label }}</option>
-      {% endfor %}
-    </select>
-    <div class="actions-row"><button type="submit" class="btn">Create account</button></div>
+    <div class="actions-row"><button type="submit" class="btn">Create Secondary User</button></div>
   </form>
 </div>
 {% endblock %}

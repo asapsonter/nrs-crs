@@ -119,17 +119,21 @@
       <span class="fset-num">3</span>
       <div class="fset-heading">
         <h2 class="fset-title">Primary User</h2>
-        <p class="fset-hint">The Primary User acts as the institution's first Checker and administers further portal users.</p>
+        <p class="fset-hint">The Primary User administers the institution's portal access and creates Secondary Users. Both prepare and submit CRS filings.</p>
       </div>
     </div>
     <div class="fset-body">
-      <div class="fset-grid">
+      <div class="fset-grid three">
         <div class="field">
           <label for="pu_surname">Surname</label>
           <input type="text" name="pu_surname" id="pu_surname" value="{{ values.pu_surname|default:'' }}" required>
         </div>
         <div class="field">
-          <label for="pu_first_name">First name</label>
+          <label for="pu_middle_name">Middle name</label>
+          <input type="text" name="pu_middle_name" id="pu_middle_name" value="{{ values.pu_middle_name|default:'' }}">
+        </div>
+        <div class="field">
+          <label for="pu_first_name">Other names</label>
           <input type="text" name="pu_first_name" id="pu_first_name" value="{{ values.pu_first_name|default:'' }}" required>
         </div>
       </div>
@@ -166,7 +170,7 @@
           <input type="file" name="id_document" id="id_document" accept="application/pdf,image/*" required>
         </div>
         <div class="field">
-          <label for="ceo_letter">CEO letter clearance form (PDF)</label>
+          <label for="ceo_letter">Letter of Authorisation (PDF)</label>
           <input type="file" name="ceo_letter" id="ceo_letter" accept="application/pdf" required>
         </div>
       </div>

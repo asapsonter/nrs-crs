@@ -19,33 +19,24 @@
       </a>
     </div>
     <nav>
-      {% if user.is_superuser %}
-        <div class="nav-section">Administration</div>
-        <a href="/backoffice/admin-console/" class="{% if nav == 'admin' %}active{% endif %}">Admin Console</a>
-        <a href="/backoffice/admin-console/officers/" class="{% if nav == 'officers' %}active{% endif %}">Users</a>
-        <a href="/backoffice/admin-console/sessions/" class="{% if nav == 'sessions' %}active{% endif %}">Live Sessions</a>
-        <a href="/backoffice/audit/" class="{% if nav == 'audit' %}active{% endif %}">Audit Log</a>
-        <a href="/backoffice/audit/credentials/" class="{% if nav == 'audit-credentials' %}active{% endif %}">Credential History</a>
-      {% elif credential %}
+      {% if user.is_superuser or credential %}
         <div class="nav-section">Overview</div>
         <a href="/backoffice/" class="{% if nav == 'dashboard' %}active{% endif %}">Dashboard</a>
-        {% if 'view_registration' in bo_caps or 'view_returns' in bo_caps %}
-          <div class="nav-section">Process 1 · Front-End Filing</div>
-          {% if 'view_registration' in bo_caps %}
-          <a href="/backoffice/registration/" class="{% if nav == 'registration' %}active{% endif %}">Enrolment &amp; Approval</a>
-          {% endif %}
-          {% if 'view_returns' in bo_caps %}
-          <a href="/backoffice/returns/" class="{% if nav == 'returns' %}active{% endif %}">Returns Validation</a>
-          {% endif %}
+        {% if 'view_registration' in bo_caps %}
+          <div class="nav-section">FI Management</div>
+          <a href="/backoffice/registration/" class="{% if nav == 'registration' %}active{% endif %}">Enrolments</a>
+          <a href="/backoffice/institutions/" class="{% if nav == 'institutions' %}active{% endif %}">Financial Institutions</a>
         {% endif %}
-        {% if 'view_exchange' in bo_caps %}
-          <div class="nav-section">Process 2 · Outbound Exchange</div>
-          <a href="/backoffice/exchange/" class="{% if nav == 'exchange' %}active{% endif %}">Exchange Packages</a>
-          <a href="/backoffice/exchange/corrections/" class="{% if nav == 'corrections' %}active{% endif %}">Correction Queue</a>
+        {% if 'view_returns' in bo_caps %}
+          <div class="nav-section">Submissions</div>
+          <a href="/backoffice/returns/" class="{% if nav == 'returns' %}active{% endif %}">Submissions &amp; Validation</a>
+          <a href="/backoffice/compliance/" class="{% if nav == 'compliance' %}active{% endif %}">Compliance Monitor</a>
         {% endif %}
         {% if 'view_exchange' in bo_caps or 'view_tax_authority' in bo_caps %}
-          <div class="nav-section">Process 3 · Inbound Receipt</div>
+          <div class="nav-section">Exchange &middot; CTS</div>
           {% if 'view_exchange' in bo_caps %}
+          <a href="/backoffice/exchange/" class="{% if nav == 'exchange' %}active{% endif %}">Outbound Packages</a>
+          <a href="/backoffice/exchange/corrections/" class="{% if nav == 'corrections' %}active{% endif %}">Correction Queue</a>
           <a href="/backoffice/exchange/inbound/" class="{% if nav == 'inbound' %}active{% endif %}">Inbound Files</a>
           {% endif %}
           {% if 'view_tax_authority' in bo_caps %}
@@ -53,14 +44,22 @@
           {% endif %}
         {% endif %}
         {% if 'view_reports' in bo_caps or 'view_audit' in bo_caps %}
-          <div class="nav-section">Oversight</div>
+          <div class="nav-section">AEOI Analytics</div>
           {% if 'view_reports' in bo_caps %}
-          <a href="/backoffice/reports/" class="{% if nav == 'reports' %}active{% endif %}">Reports</a>
+          <a href="/backoffice/reports/" class="{% if nav == 'reports' %}active{% endif %}">Reports &amp; Insights</a>
           {% endif %}
-          {% if 'view_audit' in bo_caps %}
+          {% if 'view_audit' in bo_caps and not user.is_superuser %}
           <a href="/backoffice/audit/" class="{% if nav == 'audit' %}active{% endif %}">Audit Log</a>
           {% endif %}
         {% endif %}
+      {% endif %}
+      {% if user.is_superuser %}
+        <div class="nav-section">Administration</div>
+        <a href="/backoffice/admin-console/" class="{% if nav == 'admin' %}active{% endif %}">Admin Console</a>
+        <a href="/backoffice/admin-console/officers/" class="{% if nav == 'officers' %}active{% endif %}">Users</a>
+        <a href="/backoffice/admin-console/sessions/" class="{% if nav == 'sessions' %}active{% endif %}">Live Sessions</a>
+        <a href="/backoffice/audit/" class="{% if nav == 'audit' %}active{% endif %}">Audit Log</a>
+        <a href="/backoffice/audit/credentials/" class="{% if nav == 'audit-credentials' %}active{% endif %}">Credential History</a>
       {% endif %}
     </nav>
     <div class="side-foot">

@@ -1,0 +1,38 @@
+{% extends "backoffice/base.html" %}
+{% load pills %}
+{% block title %}Financial Institutions · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>Financial Institutions</h1>
+<p class="page-sub">The register of the enrolled Reporting Financial Institution community: {{ total }} institution{{ total|pluralize }} across all statuses.</p>
+
+<div class="actions-row" style="margin-bottom: 16px; flex-wrap: wrap;">
+  <a class="btn small {% if not status_filter %}secondary{% else %}ghost{% endif %}" href="/backoffice/institutions/">All ({{ total }})</a>
+  {% for value, label in status_choices %}
+  <a class="btn small {% if status_filter == value %}secondary{% else %}ghost{% endif %}" href="/backoffice/institutions/?status={{ value }}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<table class="data">
+  <thead><tr>
+    <th>Reference</th><th>Legal name</th><th>Category</th><th>TIN</th>
+    <th>Status</th><th>Portal users</th><th>Filings</th><th>Enrolled</th><th></th>
+  </tr></thead>
+  <tbody>
+    {% for rfi in rfis %}
+    <tr>
+      <td class="mono">{{ rfi.reference }}</td>
+      <td>{{ rfi.legal_name }}</td>
+      <td>{{ rfi.get_category_display }}</td>
+      <td class="mono">{{ rfi.tin }}</td>
+      <td>{% pill rfi.status rfi.get_status_display %}</td>
+      <td class="num">{{ rfi.user_count }}</td>
+      <td class="num">{{ rfi.filing_count }}</td>
+      <td>{{ rfi.submitted_at|date:"Y-m-d" }}</td>
+      <td><a href="/backoffice/registration/{{ rfi.pk }}/">Open</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="9" class="muted">No institutions match this filter.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

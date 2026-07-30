@@ -1,0 +1,52 @@
+<script>
+/* Conditional field rules for the CRS account form, following AEOI portal
+   convention (Vizor/BVIFARS):
+     - Account Holder Type must be left blank for individual account holders,
+       so the field is disabled and blurred when Holder type is INDIVIDUAL.
+     - Birth information applies to individuals only, so Date of birth is
+       disabled and blurred for ORGANISATION holders.
+     - Controlling person entry stays disabled unless the entity is a Passive
+       NFE with controlling persons (AcctHolderType CRS101). */
+(function () {
+  var holderType = document.getElementById("holder_type");
+  if (!holderType) return;
+  var acctType = document.getElementById("acct_holder_type");
+  var birthDate = document.getElementById("birth_date");
+  var cpPanel = document.getElementById("add-cp");
+  var cpNote = document.getElementById("cp-disabled-note");
+
+  function labelFor(control) {
+    return control ? document.querySelector('label[for="' + control.id + '"]') : null;
+  }
+
+  function setState(control, enabled) {
+    if (!control) return;
+    control.disabled = !enabled;
+    control.classList.toggle("is-blurred", !enabled);
+    var label = labelFor(control);
+    if (label) label.classList.toggle("is-dim", !enabled);
+  }
+
+  function apply() {
+    var isIndividual = holderType.value === "INDIVIDUAL";
+    // Entity classification applies to entity holders only; the control is
+    // disabled (and ignored server-side) for individuals.
+    setState(acctType, !isIndividual);
+    // Birth information belongs to individuals only.
+    setState(birthDate, isIndividual);
+    // Controlling persons: CRS101 entities only.
+    if (cpPanel) {
+      var cpAllowed = !isIndividual && acctType && acctType.value === "CRS101";
+      cpPanel.classList.toggle("is-blurred", !cpAllowed);
+      cpPanel.querySelectorAll("input, select, button").forEach(function (el) {
+        el.disabled = !cpAllowed;
+      });
+      if (cpNote) cpNote.hidden = cpAllowed;
+    }
+  }
+
+  holderType.addEventListener("change", apply);
+  if (acctType) acctType.addEventListener("change", apply);
+  apply();
+})();
+</script>

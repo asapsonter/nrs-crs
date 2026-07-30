@@ -1,8 +1,7 @@
 """Filing surface for RFIs: XML upload, manual entry, nil returns, corrections.
 
-Maker and checker separation is enforced here: Makers prepare and amend,
-Checkers review and submit. A Checker cannot edit a staged filing, only
-approve, reject back with comments, or submit.
+Both the Primary User and Secondary Users prepare and submit filings to the
+NRS directly; the maker-checker review step is retired.
 """
 from __future__ import annotations
 
@@ -90,10 +89,15 @@ def filing_delete(request, filing_id: int):
     return redirect("/portal/filings/?mode=delete")
 
 
+# Statuses in which the institution may still edit a filing. PENDING_CHECKER
+# is retained for legacy filings staged under the retired maker-checker flow.
+_OPEN_STATUSES = (Filing.Status.DRAFT, Filing.Status.PENDING_CHECKER)
+
 # Filing types offered on the Create Filing entry page, in display order.
 FILING_TYPE_OPTIONS = [
     (Filing.Kind.MANUAL, "CRS Manual Entry Filing"),
     (Filing.Kind.XML_UPLOAD, "CRS XML upload Filing"),
+    (Filing.Kind.EXCEL_UPLOAD, "CRS Excel Upload Filing"),
     (Filing.Kind.PU_CHANGE, "Primary User Change Notice"),
     (Filing.Kind.ENTITY_DEACTIVATION, "Reporting Entity Deactivation"),
     (Filing.Kind.ENTITY_INFO_CHANGE, "Change of reporting entity information"),
@@ -131,17 +135,16 @@ def filing_create(request):
             if period_end is None:
                 errors.append("Enter the period end date as a valid date.")
 
-        is_crs = filing_type in (Filing.Kind.MANUAL, Filing.Kind.XML_UPLOAD)
-        if not errors and is_crs and profile.role != PortalUser.Role.MAKER:
-            errors.append("Only a Maker can prepare a CRS data filing. Checkers review and submit.")
-
+        # Both the Primary User and Secondary Users prepare and submit filings.
         if not errors:
-            if filing_type == Filing.Kind.XML_UPLOAD:
+            if filing_type in (Filing.Kind.XML_UPLOAD, Filing.Kind.EXCEL_UPLOAD):
                 # The upload step creates the filing; carry the metadata across.
                 request.session["pending_filing_meta"] = {
                     "name": name,
                     "period_end_date": period_raw,
                 }
+                if filing_type == Filing.Kind.EXCEL_UPLOAD:
+                    return redirect("/portal/filings/upload/excel/")
                 return redirect("/portal/filings/upload/")
 
             filing = Filing.objects.create(
@@ -242,15 +245,29 @@ def filing_crs_form(request, filing_id: int):
 @portal_required
 def filing_view(request, filing_id: int):
     """Form-tree view of a filing: its CRS structure as an expandable folder
-    hierarchy with per-node actions, in the manner of an AEOI filing console."""
+    hierarchy with per-node actions, in the manner of an AEOI filing console.
+
+    Follows the Vizor-style workflow: each form validates individually
+    (General Information, Reporting FI Information, and one Account
+    Information form per account); when every form is Validated the filing
+    becomes Ready to Submit and any portal user submits it to the NRS."""
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
-    records = filing.account_reports.filter(superseded=False)
+    records = list(
+        filing.account_reports.filter(superseded=False).prefetch_related("controlling_persons")
+    )
     header_done = bool(filing.receiving_country and filing.sending_company_in and filing.message_reference)
+    records_complete = all(record.is_complete for record in records)
+    incomplete_count = sum(1 for record in records if not record.is_complete)
+    # Ready to Submit: header validated and either a nil return or at least
+    # one account form, all of them complete.
+    ready_to_submit = header_done and (
+        filing.kind == Filing.Kind.NIL or (bool(records) and records_complete)
+    )
+    # Both Primary and Secondary Users prepare and submit open filings.
     can_edit = (
-        profile.role == PortalUser.Role.MAKER
-        and filing.status == Filing.Status.DRAFT
-        and filing.kind in (Filing.Kind.MANUAL, Filing.Kind.XML_UPLOAD)
+        filing.status in (Filing.Status.DRAFT, Filing.Status.PENDING_CHECKER)
+        and filing.kind in (Filing.Kind.MANUAL, Filing.Kind.XML_UPLOAD, Filing.Kind.EXCEL_UPLOAD)
     )
     return render(
         request,
@@ -258,9 +275,12 @@ def filing_view(request, filing_id: int):
         {
             "filing": filing,
             "records": records,
-            "record_count": records.count(),
+            "record_count": len(records),
             "header_done": header_done,
+            "ready_to_submit": ready_to_submit,
+            "incomplete_count": incomplete_count,
             "can_edit": can_edit,
+            "can_submit": can_edit and ready_to_submit,
             "nav": "filings",
             **_deadline_context(),
         },
@@ -269,15 +289,15 @@ def filing_view(request, filing_id: int):
 
 @portal_required
 def record_delete(request, filing_id: int, record_id: int):
-    """Maker deletes one account record from a draft filing."""
+    """Delete one account record from an open filing."""
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
     record = get_object_or_404(AccountReport, pk=record_id, filing=filing)
     target = f"/portal/filings/{filing.pk}/view/"
-    if request.method != "POST" or profile.role != PortalUser.Role.MAKER:
+    if request.method != "POST":
         return redirect(target)
-    if filing.status != Filing.Status.DRAFT:
-        messages.error(request, "Account records can only be deleted while the filing is in draft.")
+    if filing.status not in _OPEN_STATUSES:
+        messages.error(request, "Account records can only be deleted while the filing is open.")
         return redirect(target)
     ref = record.doc_ref_id
     record.delete()
@@ -288,14 +308,14 @@ def record_delete(request, filing_id: int, record_id: int):
 
 @portal_required
 def records_clear(request, filing_id: int):
-    """Maker clears the CRS Report: removes every account record from a draft."""
+    """Clear the CRS Report: remove every account record from an open filing."""
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
     target = f"/portal/filings/{filing.pk}/view/"
-    if request.method != "POST" or profile.role != PortalUser.Role.MAKER:
+    if request.method != "POST":
         return redirect(target)
-    if filing.status != Filing.Status.DRAFT:
-        messages.error(request, "The CRS Report can only be cleared while the filing is in draft.")
+    if filing.status not in _OPEN_STATUSES:
+        messages.error(request, "The CRS Report can only be cleared while the filing is open.")
         return redirect(target)
     count = filing.account_reports.count()
     filing.account_reports.all().delete()
@@ -318,11 +338,8 @@ def filing_created(request, filing_id: int):
 
 @portal_required
 def filing_new_manual(request):
-    """Maker path: open a manual-entry draft filing."""
+    """Open a manual-entry draft filing (any portal user)."""
     profile = request.portal_profile
-    if profile.role != PortalUser.Role.MAKER:
-        messages.error(request, "Only a Maker can prepare filings. Checkers review and submit.")
-        return redirect("/portal/filings/")
     filing = Filing.objects.create(
         reference=next_filing_reference(),
         rfi=profile.rfi,
@@ -336,11 +353,8 @@ def filing_new_manual(request):
 
 @portal_required
 def filing_upload(request):
-    """Maker path: CRS XML upload validated against the simplified schema."""
+    """CRS XML upload validated against the simplified schema (any portal user)."""
     profile = request.portal_profile
-    if profile.role != PortalUser.Role.MAKER:
-        messages.error(request, "Only a Maker can prepare filings. Checkers review and submit.")
-        return redirect("/portal/filings/")
     errors: list[str] = []
     if request.method == "POST":
         upload = request.FILES.get("crs_file")
@@ -393,6 +407,88 @@ def filing_upload(request):
 
 
 @portal_required
+def filing_upload_excel(request):
+    """CRS filing prepared in the Excel or CSV template (any portal user).
+
+    One account per row; optional controlling person columns are honoured for
+    Passive NFE (CRS101) rows. The parsed rows become account reports on a new
+    draft filing, exactly as with the XML upload path."""
+    from portal.excel_ingest import ALL_COLUMNS, REQUIRED_COLUMNS, parse_excel_upload
+
+    profile = request.portal_profile
+    errors: list[str] = []
+    if request.method == "POST":
+        upload = request.FILES.get("crs_file")
+        if upload is None:
+            errors = ["Choose a .xlsx or .csv file prepared with the CRS template."]
+        else:
+            result = parse_excel_upload(upload.read(), upload.name)
+            if not result.ok:
+                errors = result.errors
+            else:
+                meta = request.session.pop("pending_filing_meta", None) or {}
+                filing = Filing.objects.create(
+                    reference=next_filing_reference(),
+                    name=meta.get("name", ""),
+                    rfi=profile.rfi,
+                    reporting_year=config.CURRENT_REPORTING_YEAR,
+                    period_end_date=parse_date(meta.get("period_end_date", "") or "") if meta.get("period_end_date") else None,
+                    kind=Filing.Kind.EXCEL_UPLOAD,
+                    created_by=profile,
+                    uploaded_filename=upload.name,
+                )
+                for parsed in result.records:
+                    record = AccountReport.objects.create(
+                        filing=filing,
+                        doc_ref_id=next_doc_ref_id(profile.rfi, filing.reporting_year),
+                        holder_name=parsed.holder_name,
+                        holder_type=parsed.holder_type,
+                        acct_holder_type=parsed.acct_holder_type,
+                        residence_country=parsed.residence_country,
+                        foreign_tin=parsed.foreign_tin,
+                        tin_unavailable_reason=parsed.tin_unavailable_reason,
+                        holder_address=parsed.holder_address,
+                        address_country=parsed.address_country,
+                        birth_date=parsed.birth_date,
+                        self_certification=parsed.self_certification,
+                        account_number=parsed.account_number,
+                        currency=parsed.currency,
+                        balance=parsed.balance,
+                        dividends=parsed.dividends,
+                        interest=parsed.interest,
+                        gross_proceeds=parsed.gross_proceeds,
+                        other_income=parsed.other_income,
+                    )
+                    if parsed.cp_name:
+                        ControllingPerson.objects.create(
+                            account_report=record,
+                            name=parsed.cp_name,
+                            residence_country=parsed.cp_residence,
+                            tin=parsed.cp_tin,
+                            ctrlg_person_type=parsed.cp_type or ControllingPerson.CtrlgPersonType.CRS801,
+                        )
+                _audit(
+                    profile,
+                    "FILING_UPLOADED",
+                    filing,
+                    f"CRS Excel file {upload.name} accepted with {len(result.records)} records.",
+                    after=filing.status,
+                )
+                return redirect(f"/portal/filings/{filing.pk}/created/")
+    return render(
+        request,
+        "portal/filing_upload_excel.html",
+        {
+            "errors": errors,
+            "required_columns": REQUIRED_COLUMNS,
+            "all_columns": ALL_COLUMNS,
+            "nav": "filings",
+            **_deadline_context(),
+        },
+    )
+
+
+@portal_required
 def filing_nil(request):
     """One-click nil return for the reporting year, message type CRS703."""
     profile = request.portal_profile
@@ -411,7 +507,7 @@ def filing_nil(request):
     if existing.exists():
         messages.error(request, f"A live filing already exists for {year}. A nil return is not available.")
         return redirect("/portal/filings/")
-    is_checker = profile.role == PortalUser.Role.CHECKER
+    # Any portal user submits the nil return to the NRS directly.
     filing = Filing.objects.create(
         reference=next_filing_reference(),
         rfi=profile.rfi,
@@ -419,21 +515,18 @@ def filing_nil(request):
         kind=Filing.Kind.NIL,
         message_type=Filing.MessageType.CRS703,
         created_by=profile,
-        status=Filing.Status.SUBMITTED if is_checker else Filing.Status.PENDING_CHECKER,
-        submitted_at=timezone.now() if is_checker else None,
-        checker=profile if is_checker else None,
+        status=Filing.Status.SUBMITTED,
+        submitted_at=timezone.now(),
+        checker=profile,
     )
     _audit(
         profile,
         "NIL_RETURN_FILED",
         filing,
-        f"Nil return (CRS703) for {year} {'submitted to NRS' if is_checker else 'staged for Checker submission'}.",
+        f"Nil return (CRS703) for {year} submitted to NRS.",
         after=filing.status,
     )
-    messages.success(
-        request,
-        f"Nil return for {year} {'submitted to the NRS' if is_checker else 'staged for Checker approval'}.",
-    )
+    messages.success(request, f"Nil return for {year} submitted to the NRS.")
     return redirect("/portal/filings/")
 
 
@@ -467,14 +560,13 @@ def filing_detail(request, filing_id: int):
     flagged_ids = set(
         filing.findings.filter(account_report__isnull=False).values_list("account_report_id", flat=True)
     )
-    is_maker = profile.role == PortalUser.Role.MAKER
-    is_checker = profile.role == PortalUser.Role.CHECKER
-    can_edit = (
-        is_maker
-        and filing.status == Filing.Status.DRAFT
-        and filing.kind in (Filing.Kind.MANUAL, Filing.Kind.XML_UPLOAD)
+    # Any portal user (Primary or Secondary) prepares and submits filings.
+    can_edit = filing.status in _OPEN_STATUSES and filing.kind in (
+        Filing.Kind.MANUAL,
+        Filing.Kind.XML_UPLOAD,
+        Filing.Kind.EXCEL_UPLOAD,
     )
-    can_correct = is_maker and filing.status == Filing.Status.RETURNED
+    can_correct = filing.status == Filing.Status.RETURNED
     return render(
         request,
         "portal/filing_detail.html",
@@ -488,10 +580,8 @@ def filing_detail(request, filing_id: int):
             "file_findings": filing.findings.filter(account_report__isnull=True),
             "can_edit": can_edit,
             "can_correct": can_correct,
-            "can_stage": is_maker
-            and filing.status == Filing.Status.DRAFT
+            "can_submit": filing.status in _OPEN_STATUSES
             and (filing.kind == Filing.Kind.NIL or records.exists()),
-            "can_check": is_checker and filing.status == Filing.Status.PENDING_CHECKER,
             "can_resubmit": can_correct and not filing.findings.filter(
                 account_report__isnull=False, account_report__superseded=False
             ).exclude(account_report__doc_type_indic=AccountReport.DocTypeIndic.OECD2).exists(),
@@ -503,11 +593,11 @@ def filing_detail(request, filing_id: int):
 
 @portal_required
 def record_add(request, filing_id: int):
-    """Maker adds an account report block to a draft manual filing."""
+    """Add an account report block to an open manual filing."""
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
-    if profile.role != PortalUser.Role.MAKER or filing.status != Filing.Status.DRAFT:
-        messages.error(request, "Records can only be added by a Maker while the filing is in draft.")
+    if filing.status not in _OPEN_STATUSES:
+        messages.error(request, "Records can only be added while the filing is open.")
         return redirect(f"/portal/filings/{filing.pk}/")
     if request.method == "POST":
         error = _apply_record_form(request, filing, None, profile)
@@ -535,6 +625,10 @@ def _apply_record_form(request, filing: Filing, record: AccountReport | None, pr
     acct_holder_type = request.POST.get("acct_holder_type", "").strip()
     if acct_holder_type not in dict(AccountReport.AcctHolderType.choices):
         acct_holder_type = ""
+    # Entity holders always carry a classification; default to the first
+    # option (CRS101) when none was selected.
+    if holder_type == "ORGANISATION" and not acct_holder_type:
+        acct_holder_type = AccountReport.AcctHolderType.CRS101
     self_certification = request.POST.get("self_certification", "").strip()
     if self_certification not in dict(AccountReport.SelfCertification.choices):
         self_certification = ""
@@ -596,18 +690,15 @@ def _apply_record_form(request, filing: Filing, record: AccountReport | None, pr
 
 @portal_required
 def record_edit(request, filing_id: int, record_id: int):
-    """Maker amends a record: freely in draft, flagged records only when returned."""
+    """Amend a record: freely while open, flagged records only when returned."""
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
     record = get_object_or_404(AccountReport, pk=record_id, filing=filing, superseded=False)
-    if profile.role != PortalUser.Role.MAKER:
-        messages.error(request, "Only a Maker can amend records.")
-        return redirect(f"/portal/filings/{filing.pk}/")
     if filing.status == Filing.Status.RETURNED:
         if not filing.findings.filter(account_report=record).exists():
             messages.error(request, "Only records flagged by the NRS may be amended on a returned filing.")
             return redirect(f"/portal/filings/{filing.pk}/")
-    elif filing.status != Filing.Status.DRAFT:
+    elif filing.status not in _OPEN_STATUSES:
         messages.error(request, "This filing is not open for amendment.")
         return redirect(f"/portal/filings/{filing.pk}/")
     if request.method == "POST":
@@ -647,20 +738,36 @@ def record_edit(request, filing_id: int, record_id: int):
 
 @portal_required
 def controlling_person_add(request, filing_id: int, record_id: int):
-    """Maker adds a controlling person to a Passive NFE account record."""
+    """Add a controlling person to a Passive NFE account record."""
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
     record = get_object_or_404(AccountReport, pk=record_id, filing=filing, superseded=False)
     target = f"/portal/filings/{filing.pk}/records/{record.pk}/"
-    if request.method != "POST" or profile.role != PortalUser.Role.MAKER:
+    if request.method != "POST":
         return redirect(target)
-    if filing.status not in (Filing.Status.DRAFT, Filing.Status.RETURNED):
+    if filing.status not in (*_OPEN_STATUSES, Filing.Status.RETURNED):
         messages.error(request, "Controlling persons can only be edited while the filing is open.")
         return redirect(target)
-    name = request.POST.get("cp_name", "").strip()
+    if not record.requires_controlling_persons:
+        messages.error(
+            request,
+            "Controlling persons are only reported for a Passive NFE with controlling persons "
+            "(entity account holder type CRS101).",
+        )
+        return redirect(target)
+    surname = request.POST.get("cp_surname", "").strip()
+    middle_name = request.POST.get("cp_middle_name", "").strip()
+    other_names = request.POST.get("cp_other_names", "").strip()
+    # Legacy single-field alias, and composition in natural order.
+    name = request.POST.get("cp_name", "").strip() or " ".join(
+        part for part in [other_names, middle_name, surname] if part
+    )
     residence = request.POST.get("cp_residence", "").strip().upper()
     if not name or not residence:
-        messages.error(request, "Controlling person name and residence jurisdiction are required.")
+        messages.error(
+            request,
+            "Controlling person surname, other names, and residence jurisdiction are required.",
+        )
         return redirect(target)
     cp_type = request.POST.get("cp_type", "").strip()
     if cp_type not in dict(ControllingPerson.CtrlgPersonType.choices):
@@ -681,16 +788,13 @@ def controlling_person_add(request, filing_id: int, record_id: int):
 
 @portal_required
 def controlling_person_delete(request, filing_id: int, record_id: int, cp_id: int):
-    """Maker removes a controlling person from an account record."""
+    """Remove a controlling person from an account record."""
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
     record = get_object_or_404(AccountReport, pk=record_id, filing=filing)
     cp = get_object_or_404(ControllingPerson, pk=cp_id, account_report=record)
     target = f"/portal/filings/{filing.pk}/records/{record.pk}/"
-    if request.method == "POST" and profile.role == PortalUser.Role.MAKER and filing.status in (
-        Filing.Status.DRAFT,
-        Filing.Status.RETURNED,
-    ):
+    if request.method == "POST" and filing.status in (*_OPEN_STATUSES, Filing.Status.RETURNED):
         cp.delete()
         _audit(profile, "CONTROLLING_PERSON_REMOVED", filing, f"Controlling person removed from {record.doc_ref_id}.")
         messages.success(request, "Controlling person removed.")
@@ -699,63 +803,65 @@ def controlling_person_delete(request, filing_id: int, record_id: int, cp_id: in
 
 @portal_required
 def filing_stage(request, filing_id: int):
-    """Maker sends a draft to the Checker."""
+    """Submit a filing to the NRS directly.
+
+    Any portal user (Primary or Secondary) submits; the maker-checker review
+    step is retired. The endpoint keeps its /stage/ path for continuity.
+    """
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
-    if request.method != "POST" or profile.role != PortalUser.Role.MAKER:
+    if request.method != "POST":
         return redirect(f"/portal/filings/{filing.pk}/")
-    if filing.status not in (Filing.Status.DRAFT, Filing.Status.RETURNED):
-        messages.error(request, "This filing cannot be staged from its current status.")
+    if filing.status not in (*_OPEN_STATUSES, Filing.Status.RETURNED):
+        messages.error(request, "This filing cannot be submitted from its current status.")
         return redirect(f"/portal/filings/{filing.pk}/")
     if filing.kind != Filing.Kind.NIL and not filing.account_reports.filter(superseded=False).exists():
-        messages.error(request, "Add at least one account report before staging.")
+        messages.error(request, "Add at least one account report before submitting.")
         return redirect(f"/portal/filings/{filing.pk}/")
     before = filing.status
-    filing.status = Filing.Status.PENDING_CHECKER
-    filing.save(update_fields=["status"])
-    _audit(profile, "FILING_STAGED", filing, "Filing staged for Checker review.", before=before, after=filing.status)
-    messages.success(request, "Filing sent to the Checker for review and submission.")
+    filing.status = Filing.Status.SUBMITTED
+    filing.checker = profile
+    filing.submitted_at = timezone.now()
+    filing.save(update_fields=["status", "checker", "submitted_at"])
+    _audit(
+        profile,
+        "FILING_SUBMITTED",
+        filing,
+        f"Filing submitted to the NRS by {profile.get_role_display()}.",
+        before=before,
+        after=filing.status,
+    )
+    messages.success(request, f"{filing.reference} submitted to the NRS.")
     return redirect(f"/portal/filings/{filing.pk}/")
 
 
-@portal_required
-def filing_check(request, filing_id: int):
-    """Checker submits to NRS, or rejects back to the Maker with comments."""
-    profile = request.portal_profile
-    filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
-    if request.method != "POST" or profile.role != PortalUser.Role.CHECKER:
-        return redirect(f"/portal/filings/{filing.pk}/")
-    if filing.status != Filing.Status.PENDING_CHECKER:
-        messages.error(request, "This filing is not awaiting Checker action.")
-        return redirect(f"/portal/filings/{filing.pk}/")
-    action = request.POST.get("action", "")
-    before = filing.status
-    if action == "submit":
-        filing.status = Filing.Status.SUBMITTED
-        filing.checker = profile
-        filing.submitted_at = timezone.now()
-        filing.save()
-        _audit(profile, "FILING_SUBMITTED", filing, "Checker submitted the filing to the NRS.", before=before, after=filing.status)
-        messages.success(request, f"{filing.reference} submitted to the NRS.")
-    elif action == "reject":
-        comment = request.POST.get("comment", "").strip()
-        if not comment:
-            messages.error(request, "A rejection back to the Maker requires a comment.")
-            return redirect(f"/portal/filings/{filing.pk}/")
-        filing.status = Filing.Status.RETURNED if filing.returned_at else Filing.Status.DRAFT
-        filing.checker_comment = comment
-        filing.save()
-        _audit(profile, "FILING_REJECTED_BY_CHECKER", filing, f"Checker returned the filing to the Maker: {comment}", before=before, after=filing.status)
-        messages.success(request, "Filing returned to the Maker with comments.")
-    return redirect(f"/portal/filings/{filing.pk}/")
+# Retired: the maker-checker review step no longer exists. Both the Primary
+# User and Secondary Users submit filings to the NRS directly (see
+# filing_stage above). Kept commented for reference.
+#
+# @portal_required
+# def filing_check(request, filing_id: int):
+#     """Checker submits to NRS, or rejects back to the Maker with comments."""
+#     profile = request.portal_profile
+#     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
+#     if request.method != "POST" or profile.role != PortalUser.Role.CHECKER:
+#         return redirect(f"/portal/filings/{filing.pk}/")
+#     if filing.status != Filing.Status.PENDING_CHECKER:
+#         messages.error(request, "This filing is not awaiting Checker action.")
+#         return redirect(f"/portal/filings/{filing.pk}/")
+#     action = request.POST.get("action", "")
+#     if action == "submit":
+#         ... submitted to the NRS ...
+#     elif action == "reject":
+#         ... returned to the Maker with comments ...
 
 
 @portal_required
 def filing_resubmit(request, filing_id: int):
-    """Maker resubmits a corrected filing; the lineage travels with it."""
+    """Resubmit a corrected filing to the NRS; the lineage travels with it."""
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
-    if request.method != "POST" or profile.role != PortalUser.Role.MAKER:
+    if request.method != "POST":
         return redirect(f"/portal/filings/{filing.pk}/")
     if filing.status != Filing.Status.RETURNED:
         messages.error(request, "Only a filing returned for correction can be resubmitted.")
@@ -767,15 +873,17 @@ def filing_resubmit(request, filing_id: int):
         messages.error(request, "Amend the flagged records before resubmitting.")
         return redirect(f"/portal/filings/{filing.pk}/")
     before = filing.status
-    filing.status = Filing.Status.PENDING_CHECKER
-    filing.save(update_fields=["status"])
+    filing.status = Filing.Status.SUBMITTED
+    filing.checker = profile
+    filing.submitted_at = timezone.now()
+    filing.save(update_fields=["status", "checker", "submitted_at"])
     _audit(
         profile,
-        "FILING_CORRECTION_STAGED",
+        "FILING_CORRECTION_SUBMITTED",
         filing,
-        f"Correction staged for Checker with {corrected} amended records carrying CorrDocRefID references.",
+        f"Correction resubmitted to the NRS with {corrected} amended records carrying CorrDocRefID references.",
         before=before,
         after=filing.status,
     )
-    messages.success(request, "Corrections staged for Checker submission.")
+    messages.success(request, "Corrections resubmitted to the NRS.")
     return redirect(f"/portal/filings/{filing.pk}/")

@@ -77,15 +77,20 @@ def console(request):
 def officers(request):
     """User register: create internal users with one or more roles."""
     if request.method == "POST":
-        name = request.POST.get("name", "").strip()
+        surname = request.POST.get("surname", "").strip()
+        middle_name = request.POST.get("middle_name", "").strip()
+        other_names = request.POST.get("other_names", "").strip()
+        # Display name in natural order: other names, middle name, surname.
+        name = " ".join(part for part in [other_names, middle_name, surname] if part)
         email = request.POST.get("email", "").strip().lower()
+        phone = request.POST.get("phone", "").strip()
         roles = _posted_roles(request)
-        if not name or not email or not roles:
-            messages.error(request, "Name, email, and at least one role are required.")
+        if not surname or not other_names or not email or not phone or not roles:
+            messages.error(request, "Surname, other names, email, phone number, and at least one role are required.")
         elif OfficerProfile.objects.filter(email=email).exists():
             messages.error(request, "A user with that email already exists.")
         else:
-            officer = OfficerProfile.objects.create(name=name, email=email, roles=",".join(roles))
+            officer = OfficerProfile.objects.create(name=name, email=email, phone=phone, roles=",".join(roles))
             AuditLog.record(
                 actor_name="Super Admin",
                 actor_role=Roles.SUPER_ADMIN.label,

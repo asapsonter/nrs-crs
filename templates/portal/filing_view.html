@@ -1,4 +1,5 @@
 {% extends "portal/base.html" %}
+{% load humanize %}
 {% block title %}View Filing · {{ filing.name|default:filing.reference }} · NRS AEOI-CRS Portal{% endblock %}
 {% block content %}
 <h1>View Filing</h1>
@@ -47,7 +48,13 @@
     <span class="vf-ic type-formset">{% include "portal/_vf_icons.html" with i="formset" %}</span>
     {{ filing.name|default:filing.get_kind_display }}
   </div>
-  <span class="vf-status draft big">{% if filing.status == 'DRAFT' %}In Draft{% else %}{{ filing.get_status_display }}{% endif %}</span>
+  {% if filing.status == 'DRAFT' and ready_to_submit %}
+  <span class="vf-status validated big">Ready to Submit</span>
+  {% elif filing.status == 'DRAFT' %}
+  <span class="vf-status draft big">In Draft</span>
+  {% else %}
+  <span class="vf-status draft big">{{ filing.get_status_display }}</span>
+  {% endif %}
 </div>
 
 {# The CRS message structure as a folder tree. Actions operate on the real
@@ -85,13 +92,14 @@
 
       <li class="vf-node">
         <div class="vf-row">
+          <button type="button" class="vf-toggle" aria-label="Expand or collapse">&minus;</button>
           <span class="vf-code crs">CRS</span>
           <span class="vf-ic type-repeat">{% include "portal/_vf_icons.html" with i="repeat" %}</span>
           <span class="vf-title">CRS Report</span>
           {% if record_count %}<span class="vf-status validated">Validated</span>{% else %}<span class="vf-status nodata">No Data</span>{% endif %}
           <span class="vf-actions">
             {% if can_edit %}
-            <a class="vf-act add" href="/portal/filings/{{ filing.pk }}/#add-record">Add</a>
+            <a class="vf-act add" href="/portal/filings/{{ filing.pk }}/#add-record">Add Section</a>
             {% if record_count %}
             <form method="post" action="/portal/filings/{{ filing.pk }}/records/clear/" onsubmit="return confirm('Delete all {{ record_count }} account record{{ record_count|pluralize }} from this report?');">
               {% csrf_token %}
@@ -105,6 +113,7 @@
         <ul>
           <li class="vf-node">
             <div class="vf-row">
+              <button type="button" class="vf-toggle" aria-label="Expand or collapse">&minus;</button>
               <span class="vf-ic type-folder">{% include "portal/_vf_icons.html" with i="folder" %}</span>
               <span class="vf-title">CRS Report</span>
               <span class="vf-count">{{ record_count }}</span>
@@ -134,13 +143,17 @@
               </li>
               <li class="vf-node">
                 <div class="vf-row">
+                  <button type="button" class="vf-toggle" aria-label="Expand or collapse">&minus;</button>
                   <span class="vf-code ai">AI</span>
-                  <span class="vf-ic type-add">{% include "portal/_vf_icons.html" with i="add" %}</span>
+                  <span class="vf-ic type-repeat">{% include "portal/_vf_icons.html" with i="repeat" %}</span>
                   <span class="vf-title">Account Information</span>
-                  {% if record_count %}<span class="vf-status validated">{{ record_count }} record{{ record_count|pluralize }}</span>{% else %}<span class="vf-status nodata">No Data</span>{% endif %}
+                  {% if record_count %}
+                    {% if incomplete_count %}<span class="vf-status draft">{{ incomplete_count }} in draft</span>
+                    {% else %}<span class="vf-status validated">{{ record_count }} record{{ record_count|pluralize }} validated</span>{% endif %}
+                  {% else %}<span class="vf-status nodata">No Data</span>{% endif %}
                   <span class="vf-actions">
                     {% if can_edit %}
-                    <a class="vf-act add" href="/portal/filings/{{ filing.pk }}/#add-record">Add</a>
+                    <a class="vf-act add" href="/portal/filings/{{ filing.pk }}/#add-record">Add Section</a>
                     {% endif %}
                   </span>
                 </div>
@@ -150,9 +163,15 @@
                   {% for r in records %}
                   <li class="vf-node">
                     <div class="vf-row">
+                      {% if r.requires_controlling_persons %}<button type="button" class="vf-toggle" aria-label="Expand or collapse">&minus;</button>{% endif %}
                       <span class="vf-ic type-form">{% include "portal/_vf_icons.html" with i="form" %}</span>
                       <span class="vf-title">{{ r.holder_name }}</span>
-                      <span class="vf-rec-meta">{{ r.residence_country }} &middot; {{ r.account_number }}</span>
+                      <span class="vf-rec-meta">
+                        {{ r.residence_country }} &middot; {{ r.account_number }} &middot; {{ r.balance|intcomma }} {{ r.currency }}{% if r.birth_date %} &middot; DOB {{ r.birth_date|date:"Y-m-d" }}{% endif %}
+                      </span>
+                      {% if r.is_complete %}<span class="vf-status validated">Validated</span>{% else %}<span class="vf-status draft">In Draft</span>{% endif %}
+                      {% if r.self_certification == 'NOT_OBTAINED' %}<span class="vf-status mandatory">Undocumented</span>
+                      {% elif not r.self_certification %}<span class="vf-status nodata">No self-cert</span>{% endif %}
                       <span class="vf-actions">
                         {% if can_edit %}
                         <a class="vf-act" href="/portal/filings/{{ filing.pk }}/records/{{ r.pk }}/">Edit</a>
@@ -160,11 +179,52 @@
                           {% csrf_token %}
                           <button type="submit" class="vf-act danger">Delete</button>
                         </form>
-                        {% else %}
-                        <span class="vf-rec-meta">{{ r.balance }} {{ r.currency }}</span>
                         {% endif %}
                       </span>
                     </div>
+
+                    {% if r.requires_controlling_persons %}
+                    <ul>
+                      <li class="vf-node">
+                        <div class="vf-row">
+                          <span class="vf-code cp">CP</span>
+                          <span class="vf-ic type-repeat">{% include "portal/_vf_icons.html" with i="repeat" %}</span>
+                          <span class="vf-title">Controlling Persons</span>
+                          {% with cps=r.controlling_persons.all %}
+                          {% if cps %}<span class="vf-count">{{ cps|length }}</span>{% else %}<span class="vf-status mandatory">Mandatory for CRS101</span>{% endif %}
+                          {% endwith %}
+                          <span class="vf-actions">
+                            {% if can_edit %}
+                            <a class="vf-act add" href="/portal/filings/{{ filing.pk }}/records/{{ r.pk }}/#add-cp">Add Section</a>
+                            {% endif %}
+                          </span>
+                        </div>
+                        {% with cps=r.controlling_persons.all %}
+                        {% if cps %}
+                        <ul>
+                          {% for cp in cps %}
+                          <li class="vf-node">
+                            <div class="vf-row">
+                              <span class="vf-ic type-form">{% include "portal/_vf_icons.html" with i="form" %}</span>
+                              <span class="vf-title">{{ cp.name }}</span>
+                              <span class="vf-rec-meta">{{ cp.residence_country }} &middot; {{ cp.get_ctrlg_person_type_display }}</span>
+                              <span class="vf-actions">
+                                {% if can_edit %}
+                                <form method="post" action="/portal/filings/{{ filing.pk }}/records/{{ r.pk }}/cp/{{ cp.pk }}/delete/" onsubmit="return confirm('Remove controlling person {{ cp.name|escapejs }}?');">
+                                  {% csrf_token %}
+                                  <button type="submit" class="vf-act danger">Delete</button>
+                                </form>
+                                {% endif %}
+                              </span>
+                            </div>
+                          </li>
+                          {% endfor %}
+                        </ul>
+                        {% endif %}
+                        {% endwith %}
+                      </li>
+                    </ul>
+                    {% endif %}
                   </li>
                   {% endfor %}
                 </ul>
@@ -177,6 +237,34 @@
     </ul>
   </li>
 </ul>
+</div>
+
+{# Validate and Submit: mirrors the Vizor workflow. When every form is
+   Validated the filing is Ready to Submit, and any portal user (Primary or
+   Secondary) submits it to the NRS directly. #}
+<div class="vf-submit-panel">
+  {% if can_submit %}
+  <div class="vf-submit-ready">
+    <div>
+      <strong>Ready to Submit.</strong>
+      <span class="muted">All forms are validated. Submitting transmits this filing to the NRS.</span>
+    </div>
+    <form method="post" action="/portal/filings/{{ filing.pk }}/stage/"
+          onsubmit="return confirm('Submit {{ filing.reference }} to the NRS?');">
+      {% csrf_token %}
+      <button type="submit" class="btn">Validate &amp; Submit</button>
+    </form>
+  </div>
+  {% elif can_edit %}
+  <div class="vf-submit-blocked">
+    <strong>Not yet ready to submit.</strong>
+    <ul class="vf-todo">
+      {% if not header_done %}<li>Complete and validate the General Information form.</li>{% endif %}
+      {% if not record_count and filing.kind != 'NIL' %}<li>Add at least one Account Information form.</li>{% endif %}
+      {% if incomplete_count %}<li>{{ incomplete_count }} Account Information form{{ incomplete_count|pluralize }} still in draft (missing address, self-certification, TIN or reason, or controlling persons).</li>{% endif %}
+    </ul>
+  </div>
+  {% endif %}
 </div>
 
 <div class="back-nav"><a class="btn-back" href="/portal/filings/drafts/">Back to draft filings</a></div>
@@ -193,6 +281,18 @@
       btn.classList.toggle("is-on", !panel.hidden);
     });
   }
+
+  /* Folder expand and collapse: the +/- toggle hides or shows the child
+     list of its node, in the manner of the Vizor filing tree. */
+  document.querySelectorAll(".vf-toggle").forEach(function (toggle) {
+    toggle.addEventListener("click", function () {
+      var node = toggle.closest(".vf-node");
+      if (!node) return;
+      var collapsed = node.classList.toggle("vf-collapsed");
+      toggle.innerHTML = collapsed ? "+" : "&minus;";
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    });
+  });
 })();
 </script>
 {% endblock %}

@@ -75,6 +75,7 @@ class OfficerProfile(RoleListMixin, models.Model):
     name = models.CharField(max_length=120)
     roles = models.CharField("Assigned roles", max_length=200, blank=True, default="")
     email = models.EmailField(unique=True)
+    phone = models.CharField("Phone number", max_length=30, blank=True, default="")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

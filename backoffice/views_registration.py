@@ -1,8 +1,10 @@
-"""Registration workspace: four-eyes review of RFI enrolment applications.
+"""Enrolments workspace, in the Vizor AEOI structure.
 
-Assistant Admins and Internal Admins record an assessment; only an Internal
-Admin makes the final decision. The person who reviewed an application may
-never decide it (four-eyes, enforced by identity).
+Financial institutions submit the Institution & Primary User Enrolment form.
+The authority reviews the enrolment and either approves it (the Primary User
+receives credentials by email) or declines it with a reason. There is no
+separate recorded-assessment step; that flow is retired to match the Vizor
+enrolment structure (see `review` below, kept commented for reference).
 """
 from __future__ import annotations
 
@@ -19,9 +21,10 @@ from portal.services import provision_portal_user, send_pu_welcome_email, send_r
 
 @require_cap(access.VIEW_REGISTRATION)
 def queue(request):
-    """Applications by state, plus the register of decided institutions."""
-    pending_review = ReportingFI.objects.filter(status=ReportingFI.Status.SUBMITTED)
-    awaiting_decision = ReportingFI.objects.filter(status=ReportingFI.Status.UNDER_REVIEW)
+    """Enrolments: requests awaiting approval, and the decided register."""
+    pending = ReportingFI.objects.filter(
+        status__in=[ReportingFI.Status.SUBMITTED, ReportingFI.Status.UNDER_REVIEW]
+    )
     decided = ReportingFI.objects.filter(
         status__in=[
             ReportingFI.Status.APPROVED,
@@ -35,8 +38,7 @@ def queue(request):
         request,
         "backoffice/registration_queue.html",
         {
-            "pending_review": pending_review,
-            "awaiting_decision": awaiting_decision,
+            "pending": pending,
             "decided": decided,
             "nav": "registration",
         },
@@ -45,20 +47,17 @@ def queue(request):
 
 @require_cap(access.VIEW_REGISTRATION)
 def detail(request, rfi_id: int):
-    """Application detail: assessment form for reviewers, decision for admins."""
+    """Enrolment detail: the Institution & Primary User Enrolment as submitted,
+    with Approve Enrolment / Decline Enrolment for authorised officers."""
     rfi = get_object_or_404(ReportingFI, pk=rfi_id)
     caps = request.caps
     can_authorise = access.DECIDE_REGISTRATION in caps
-    # An application is open for a decision while submitted or under review.
-    # Assistant Admins and Internal Admins may accept or reject it directly,
-    # with no reallocation to a separate authoriser.
+    # An enrolment is open for approval while submitted (or in the legacy
+    # under-review state from the retired assessment flow).
     awaiting_decision = rfi.status in (
         ReportingFI.Status.SUBMITTED,
         ReportingFI.Status.UNDER_REVIEW,
     )
-    # Recording an assessment stays available as an optional record, but is no
-    # longer a prerequisite for the decision.
-    can_review = access.ACT_REGISTRATION in caps and awaiting_decision
     can_decide = can_authorise and awaiting_decision
     can_manage_standing = can_authorise and rfi.status in (
         ReportingFI.Status.ACTIVE,
@@ -72,7 +71,6 @@ def detail(request, rfi_id: int):
         "backoffice/registration_detail.html",
         {
             "rfi": rfi,
-            "can_review": can_review,
             "can_decide": can_decide,
             "can_manage_standing": can_manage_standing,
             "awaiting_decision": awaiting_decision,
@@ -82,49 +80,44 @@ def detail(request, rfi_id: int):
     )
 
 
-@require_cap(access.ACT_REGISTRATION)
-def review(request, rfi_id: int):
-    """Assessment: four checks, notes, and a recommendation."""
-    rfi = get_object_or_404(
-        ReportingFI,
-        pk=rfi_id,
-        status__in=[ReportingFI.Status.SUBMITTED, ReportingFI.Status.UNDER_REVIEW],
-    )
-    if request.method != "POST":
-        return redirect(f"/backoffice/registration/{rfi.pk}/")
-    before = rfi.status
-    rfi.check_tin = bool(request.POST.get("check_tin"))
-    rfi.check_ceo_letter = bool(request.POST.get("check_ceo_letter"))
-    rfi.check_licence = bool(request.POST.get("check_licence"))
-    rfi.check_classification = bool(request.POST.get("check_classification"))
-    rfi.review_notes = request.POST.get("review_notes", "").strip()
-    recommendation = request.POST.get("recommendation", "")
-    if recommendation not in ReportingFI.Recommendation.values:
-        messages.error(request, "Select a recommendation.")
-        return redirect(f"/backoffice/registration/{rfi.pk}/")
-    rfi.recommendation = recommendation
-    rfi.reviewer = request.credential.officer
-    rfi.reviewed_at = timezone.now()
-    rfi.status = ReportingFI.Status.UNDER_REVIEW
-    rfi.save()
-    rfi.record_status_event(f"Assessment recorded. Decision proposed: {rfi.get_recommendation_display()}.")
-    AuditLog.record(
-        actor_name=request.credential.officer.name,
-        actor_role=request.credential.role_display,
-        credential=request.credential,
-        action="ENROLMENT_REVIEWED",
-        target=rfi.reference,
-        before_state=before,
-        after_state=rfi.status,
-        detail=f"Assessment recorded with recommendation {rfi.get_recommendation_display()}.",
-    )
-    messages.success(request, "Assessment recorded. You can now accept or reject the application.")
-    return redirect(f"/backoffice/registration/{rfi.pk}/")
+# Retired: the recorded-assessment step (checklist, notes, recommendation) is
+# not part of the Vizor AEOI enrolment structure, where the authority reviews
+# the submitted enrolment form and approves or declines it directly. Kept
+# commented for reference should a formal assessment stage be reinstated.
+#
+# @require_cap(access.ACT_REGISTRATION)
+# def review(request, rfi_id: int):
+#     """Assessment: four checks, notes, and a recommendation."""
+#     rfi = get_object_or_404(
+#         ReportingFI,
+#         pk=rfi_id,
+#         status__in=[ReportingFI.Status.SUBMITTED, ReportingFI.Status.UNDER_REVIEW],
+#     )
+#     if request.method != "POST":
+#         return redirect(f"/backoffice/registration/{rfi.pk}/")
+#     before = rfi.status
+#     rfi.check_tin = bool(request.POST.get("check_tin"))
+#     rfi.check_ceo_letter = bool(request.POST.get("check_ceo_letter"))
+#     rfi.check_licence = bool(request.POST.get("check_licence"))
+#     rfi.check_classification = bool(request.POST.get("check_classification"))
+#     rfi.review_notes = request.POST.get("review_notes", "").strip()
+#     recommendation = request.POST.get("recommendation", "")
+#     if recommendation not in ReportingFI.Recommendation.values:
+#         messages.error(request, "Select a recommendation.")
+#         return redirect(f"/backoffice/registration/{rfi.pk}/")
+#     rfi.recommendation = recommendation
+#     rfi.reviewer = request.credential.officer
+#     rfi.reviewed_at = timezone.now()
+#     rfi.status = ReportingFI.Status.UNDER_REVIEW
+#     rfi.save()
+#     rfi.record_status_event(f"Assessment recorded. Decision proposed: {rfi.get_recommendation_display()}.")
+#     messages.success(request, "Assessment recorded. You can now accept or reject the application.")
+#     return redirect(f"/backoffice/registration/{rfi.pk}/")
 
 
 @require_cap(access.DECIDE_REGISTRATION)
 def decide(request, rfi_id: int):
-    """Accept or reject an enrolment directly, with no separate authoriser."""
+    """Approve or decline an enrolment, per the Vizor enrolment workflow."""
     rfi = get_object_or_404(
         ReportingFI,
         pk=rfi_id,
@@ -134,6 +127,9 @@ def decide(request, rfi_id: int):
         return redirect(f"/backoffice/registration/{rfi.pk}/")
     officer = request.credential.officer
     decision = request.POST.get("decision", "")
+    # "reject" is accepted as a legacy alias for "decline".
+    if decision == "reject":
+        decision = "decline"
     before = rfi.status
     if decision == "approve":
         rfi.status = ReportingFI.Status.APPROVED
@@ -160,30 +156,30 @@ def decide(request, rfi_id: int):
             after_state=rfi.status,
             detail=f"Enrolment approved. Primary User account issued to {rfi.pu_email}.",
         )
-        messages.success(request, f"{rfi.legal_name} approved. The Primary User has been emailed a temporary password.")
-    elif decision == "reject":
+        messages.success(request, f"{rfi.legal_name} enrolment approved. The Primary User has been emailed their credentials.")
+    elif decision == "decline":
         reason = request.POST.get("rejection_reason", "").strip()
         if not reason:
-            messages.error(request, "A rejection requires a reason; it is sent to the applicant.")
+            messages.error(request, "Declining an enrolment requires a reason; it is sent to the applicant.")
             return redirect(f"/backoffice/registration/{rfi.pk}/")
         rfi.status = ReportingFI.Status.REJECTED
         rfi.rejection_reason = reason
         rfi.decided_by = officer
         rfi.decided_at = timezone.now()
         rfi.save()
-        rfi.record_status_event(f"Enrolment rejected. Reason: {reason}")
+        rfi.record_status_event(f"Enrolment declined. Reason: {reason}")
         send_rejection_email(rfi)
         AuditLog.record(
             actor_name=officer.name,
             actor_role=request.credential.role_display,
             credential=request.credential,
-            action="ENROLMENT_REJECTED",
+            action="ENROLMENT_DECLINED",
             target=rfi.reference,
             before_state=before,
             after_state=rfi.status,
-            detail=f"Enrolment rejected. Reason: {reason}",
+            detail=f"Enrolment declined. Reason: {reason}",
         )
-        messages.success(request, f"{rfi.legal_name} rejected. The applicant has been notified.")
+        messages.success(request, f"{rfi.legal_name} enrolment declined. The applicant has been notified.")
     return redirect("/backoffice/registration/")
 
 

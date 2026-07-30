@@ -40,6 +40,7 @@ def submit_enrolment(client: Client | None = None) -> ReportingFI:
             "state_province": "Lagos",
             "post_code": "101241",
             "pu_surname": "Bello",
+            "pu_middle_name": "Chidinma",
             "pu_first_name": "Ngozi",
             "pu_dob": "1985-06-15",
             "pu_designation": "Head, Regulatory Reporting",
@@ -64,6 +65,13 @@ class TestEnrolmentStateMachine:
         rfi = submit_enrolment()
         assert str(rfi.pu_dob) == "1985-06-15"
 
+    def test_name_captured_as_surname_middle_other(self):
+        rfi = submit_enrolment()
+        assert rfi.pu_surname == "Bello"
+        assert rfi.pu_middle_name == "Chidinma"
+        assert rfi.pu_first_name == "Ngozi"  # other names
+        assert rfi.pu_name == "Ngozi Chidinma Bello"
+
     def test_date_of_birth_is_required(self):
         letter = SimpleUploadedFile("ceo_letter.pdf", b"%PDF-1.4 demo", content_type="application/pdf")
         identity = SimpleUploadedFile("pu_id.pdf", b"%PDF-1.4 demo", content_type="application/pdf")
@@ -83,32 +91,21 @@ class TestEnrolmentStateMachine:
         assert "Date of birth is required." in response.content.decode()
         assert not ReportingFI.objects.filter(tin="0450088899").exists()
 
-    def test_review_moves_to_under_review(self):
+    def test_assessment_step_is_retired(self):
+        # The recorded-assessment route is not part of the Vizor enrolment
+        # structure and is no longer routed.
         rfi = submit_enrolment()
         client = backoffice_client(Roles.ASSISTANT_ADMIN)
-        client.post(
+        response = client.post(
             f"/backoffice/registration/{rfi.pk}/review/",
-            {
-                "check_tin": "on",
-                "check_ceo_letter": "on",
-                "check_licence": "on",
-                "check_classification": "on",
-                "review_notes": "All checks satisfactory.",
-                "recommendation": "APPROVE",
-            },
+            {"review_notes": "ok", "recommendation": "APPROVE"},
         )
+        assert response.status_code == 404
         rfi.refresh_from_db()
-        assert rfi.status == ReportingFI.Status.UNDER_REVIEW
-        assert rfi.recommendation == "APPROVE"
-        assert rfi.reviewer is not None
+        assert rfi.status == ReportingFI.Status.SUBMITTED
 
-    def test_supervisor_approval_provisions_primary_user(self):
+    def test_approval_provisions_primary_user(self):
         rfi = submit_enrolment()
-        reviewer = backoffice_client(Roles.ASSISTANT_ADMIN)
-        reviewer.post(
-            f"/backoffice/registration/{rfi.pk}/review/",
-            {"check_tin": "on", "review_notes": "ok", "recommendation": "APPROVE"},
-        )
         supervisor = backoffice_client(
             Roles.INTERNAL_ADMIN, name="Supervisor Two", email="sup.two@nrs.gov.ng"
         )
@@ -120,25 +117,21 @@ class TestEnrolmentStateMachine:
         assert pu.must_change_password
         assert any(rfi.pu_email in message.to for message in mail.outbox)
 
-    def test_rejection_requires_reason_and_notifies(self):
+    def test_decline_requires_reason_and_notifies(self):
         rfi = submit_enrolment()
-        reviewer = backoffice_client(Roles.ASSISTANT_ADMIN)
-        reviewer.post(
-            f"/backoffice/registration/{rfi.pk}/review/",
-            {"review_notes": "Licence not verifiable.", "recommendation": "REJECT"},
-        )
         supervisor = backoffice_client(
             Roles.INTERNAL_ADMIN, name="Supervisor Two", email="sup.two@nrs.gov.ng"
         )
-        supervisor.post(f"/backoffice/registration/{rfi.pk}/decide/", {"decision": "reject"})
+        supervisor.post(f"/backoffice/registration/{rfi.pk}/decide/", {"decision": "decline"})
         rfi.refresh_from_db()
-        assert rfi.status == ReportingFI.Status.UNDER_REVIEW  # no reason given, refused
+        assert rfi.status == ReportingFI.Status.SUBMITTED  # no reason given, refused
         supervisor.post(
             f"/backoffice/registration/{rfi.pk}/decide/",
-            {"decision": "reject", "rejection_reason": "Sector licence could not be confirmed."},
+            {"decision": "decline", "rejection_reason": "Sector licence could not be confirmed."},
         )
         rfi.refresh_from_db()
         assert rfi.status == ReportingFI.Status.REJECTED
+        assert rfi.get_status_display() == "Declined"
         assert any(rfi.pu_email in message.to for message in mail.outbox)
 
     def test_assistant_admin_decides_submitted_directly(self):
@@ -161,30 +154,54 @@ class TestEnrolmentStateMachine:
         rfi.refresh_from_db()
         assert rfi.status == ReportingFI.Status.REJECTED
 
-    def test_admin_can_decide_its_own_reviewed_application(self):
-        # A single admin may record an assessment and then decide it; the old
-        # four-eyes handoff no longer blocks the same person.
+    def test_legacy_reject_value_still_declines(self):
+        # "reject" is accepted as a legacy alias for the Vizor "decline".
         rfi = submit_enrolment()
         client = backoffice_client(Roles.INTERNAL_ADMIN)
         client.post(
-            f"/backoffice/registration/{rfi.pk}/review/",
-            {"review_notes": "ok", "recommendation": "APPROVE"},
+            f"/backoffice/registration/{rfi.pk}/decide/",
+            {"decision": "reject", "rejection_reason": "Out of CRS scope."},
         )
-        client.post(f"/backoffice/registration/{rfi.pk}/decide/", {"decision": "approve"})
         rfi.refresh_from_db()
-        assert rfi.status == ReportingFI.Status.APPROVED
+        assert rfi.status == ReportingFI.Status.REJECTED
 
     def test_read_only_user_cannot_decide(self):
         rfi = submit_enrolment()
         client = backoffice_client(Roles.VIEW_ONLY)
         response = client.post(f"/backoffice/registration/{rfi.pk}/decide/", {"decision": "approve"})
-        assert response.status_code == 404
+        # A signed-in officer lacking the capability sees an explanation, not a 404.
+        assert response.status_code == 403
+        assert "Access restricted" in response.content.decode()
         rfi.refresh_from_db()
         assert rfi.status == ReportingFI.Status.SUBMITTED
         html = client.get(f"/backoffice/registration/{rfi.pk}/").content.decode()
         assert "Awaiting a decision" in html
         assert "read-only" in html
-        assert "Approve enrolment" not in html
+        assert "Approve Enrolment" not in html
+
+    def test_superadmin_views_operations_but_cannot_act(self):
+        # The Super Admin views the combined console's operational pages
+        # read-only; processing actions remain with credentialled officers and
+        # are refused with an explanation rather than a bare 404.
+        from django.contrib.auth import get_user_model
+
+        get_user_model().objects.create_superuser(username="root", password="RootPass1!")
+        client = Client()
+        client.post("/backoffice/login/", {"username": "root", "passcode": "RootPass1!"})
+        response = client.get("/backoffice/registration/")
+        if response.status_code == 302:
+            # Super admin login may use a separate field name; sign in directly.
+            client.force_login(get_user_model().objects.get(username="root"))
+            response = client.get("/backoffice/registration/")
+        assert response.status_code == 200
+        rfi = submit_enrolment()
+        response = client.post(
+            f"/backoffice/registration/{rfi.pk}/decide/", {"decision": "approve"}
+        )
+        assert response.status_code == 403
+        html = response.content.decode()
+        assert "Access restricted" in html
+        assert "Admin Console" in html
 
     def test_suspension_from_active(self):
         rfi = submit_enrolment()

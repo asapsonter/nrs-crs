@@ -1,15 +1,15 @@
 {% extends "backoffice/base.html" %}
 {% load pills %}
-{% block title %}Registration · NRS Supervision Centre{% endblock %}
+{% block title %}Enrolments · NRS Supervision Centre{% endblock %}
 {% block content %}
-<h1>Registration workspace</h1>
-<p class="page-sub">Enrolment applications. An Assistant Admin or Internal Admin can accept or reject a new application directly.</p>
+<h1>Enrolments</h1>
+<p class="page-sub">Institution &amp; Primary User Enrolment requests. The NRS reviews each enrolment and approves it, issuing credentials to the Primary User, or declines it with a reason.</p>
 
-<h2>Awaiting first review</h2>
+<h2>Enrolment requests awaiting approval</h2>
 <table class="data">
-  <thead><tr><th>Reference</th><th>Institution</th><th>Category</th><th>Enrolment type</th><th>Submitted</th><th></th></tr></thead>
+  <thead><tr><th>Reference</th><th>Financial Institution</th><th>CRS Entity Classification</th><th>Enrolment type</th><th>Submitted</th><th></th></tr></thead>
   <tbody>
-    {% for rfi in pending_review %}
+    {% for rfi in pending %}
     <tr>
       <td class="mono">{{ rfi.reference }}</td>
       <td>{{ rfi.legal_name }}</td>
@@ -19,32 +19,14 @@
       <td><a href="/backoffice/registration/{{ rfi.pk }}/">Open</a></td>
     </tr>
     {% empty %}
-    <tr><td colspan="6" class="muted">No applications awaiting review.</td></tr>
+    <tr><td colspan="6" class="muted">No enrolment requests awaiting approval.</td></tr>
     {% endfor %}
   </tbody>
 </table>
 
-<h2>Awaiting a decision</h2>
+<h2>Register of Financial Institutions</h2>
 <table class="data">
-  <thead><tr><th>Reference</th><th>Institution</th><th>Reviewed by</th><th>Recommendation</th><th></th></tr></thead>
-  <tbody>
-    {% for rfi in awaiting_decision %}
-    <tr>
-      <td class="mono">{{ rfi.reference }}</td>
-      <td>{{ rfi.legal_name }}</td>
-      <td>{{ rfi.reviewer.name|default:"NRS Registration Unit" }}</td>
-      <td>{% if rfi.recommendation %}{{ rfi.get_recommendation_display }}{% else %}<span class="muted">Review in progress</span>{% endif %}</td>
-      <td><a href="/backoffice/registration/{{ rfi.pk }}/">Open</a></td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="5" class="muted">No applications awaiting decision.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<h2>Register of institutions</h2>
-<table class="data">
-  <thead><tr><th>Reference</th><th>Institution</th><th>Category</th><th>Status</th><th>Decided by</th><th></th></tr></thead>
+  <thead><tr><th>Reference</th><th>Financial Institution</th><th>CRS Entity Classification</th><th>Status</th><th>Decided by</th><th></th></tr></thead>
   <tbody>
     {% for rfi in decided %}
     <tr>
@@ -52,11 +34,11 @@
       <td>{{ rfi.legal_name }}</td>
       <td>{{ rfi.get_category_display }}</td>
       <td>{% pill rfi.status rfi.get_status_display %}</td>
-      <td>{{ rfi.decided_by.name|default:"NRS Registration Unit" }}</td>
+      <td>{{ rfi.decided_by.name|default:"NRS AEOI Unit" }}</td>
       <td><a href="/backoffice/registration/{{ rfi.pk }}/">Open</a></td>
     </tr>
     {% empty %}
-    <tr><td colspan="6" class="muted">No decided applications.</td></tr>
+    <tr><td colspan="6" class="muted">No decided enrolments.</td></tr>
     {% endfor %}
   </tbody>
 </table>

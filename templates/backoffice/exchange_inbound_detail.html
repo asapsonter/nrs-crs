@@ -1,5 +1,5 @@
 {% extends "backoffice/base.html" %}
-{% load pills flags %}
+{% load pills flags humanize %}
 {% block title %}{{ inbound.message_ref_id }} · Inbound{% endblock %}
 {% block content %}
 <h1 class="mono">{{ inbound.message_ref_id }}</h1>
@@ -112,7 +112,7 @@
 
 <h2>Records</h2>
 <table class="data">
-  <thead><tr><th>DocRefID</th><th>Holder (NG resident)</th><th>NG TIN</th><th>Account</th><th>Balance</th><th>Record state</th><th>Taxpayer match</th><th>Review track</th></tr></thead>
+  <thead><tr><th>DocRefID</th><th>Holder (NG resident)</th><th>NG TIN</th><th>Account Number</th><th>Balance</th><th>Record state</th><th>Taxpayer match</th><th>Review track</th></tr></thead>
   <tbody>
     {% for record in records %}
     <tr>
@@ -120,7 +120,7 @@
       <td>{{ record.holder_name }}</td>
       <td class="mono">{{ record.ng_tin|default:"-" }}</td>
       <td class="mono">{{ record.account_number }}</td>
-      <td class="num">{{ record.balance }} {{ record.currency }}</td>
+      <td class="num">{{ record.balance|intcomma }} {{ record.currency }}</td>
       <td>
         {% if record.has_error and not record.corrected %}<span class="pill rejected">{{ record.error_code }} {{ record.error_detail }}</span>
         {% elif record.corrected %}<span class="pill correction">Corrected by partner</span>
