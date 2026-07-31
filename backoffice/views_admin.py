@@ -26,28 +26,42 @@ def _posted_roles(request) -> list[str]:
 @superadmin_required
 def console(request):
     """Issue credentials to existing users and review recent issuance."""
+    from core import config, workhours
+
     issued: tuple[IssuedCredential, str] | None = None
     if request.method == "POST":
         officer = get_object_or_404(OfficerProfile, pk=request.POST.get("officer"))
         try:
-            session_hours = float(request.POST.get("session_hours", "0"))
+            session_months = int(request.POST.get("session_months", "-1"))
         except ValueError:
-            session_hours = 0.0
-        if session_hours <= 0 or session_hours > 24:
-            messages.error(request, "Session duration must be between 0 and 24 hours.")
+            session_months = -1
+        # 0 is the explicit "unlimited" choice: no expiry, no working hours.
+        if session_months < 0 or session_months > config.CREDENTIAL_MAX_MONTHS:
+            messages.error(
+                request,
+                f"Validity must be between 1 and {config.CREDENTIAL_MAX_MONTHS} months, or unlimited.",
+            )
         elif not officer.role_list:
             messages.error(request, "Assign at least one role to this user before issuing a credential.")
         else:
-            credential, passcode = IssuedCredential.objects.issue(officer, session_hours)
+            credential, passcode = IssuedCredential.objects.issue(officer, session_months)
+            if credential.is_unlimited:
+                detail = (
+                    f"Issued to {officer.name} with roles {credential.role_display} "
+                    "with unlimited validity: no expiry and no working-hours confinement."
+                )
+            else:
+                detail = (
+                    f"Issued to {officer.name} with roles {credential.role_display} "
+                    f"for a {session_months} month validity window, daily access "
+                    f"{workhours.working_hours_label()}."
+                )
             AuditLog.record(
                 actor_name="Super Admin",
                 actor_role=Roles.SUPER_ADMIN.label,
                 action="CREDENTIAL_ISSUED",
                 target=credential.username,
-                detail=(
-                    f"Issued to {officer.name} with roles {credential.role_display} "
-                    f"for a {session_hours} hour session window."
-                ),
+                detail=detail,
                 credential=credential,
             )
             issued = (credential, passcode)
@@ -154,28 +168,26 @@ def officer_history(request, officer_id: int):
 
 @superadmin_required
 def live_sessions(request):
-    """Live credential sessions with remaining time and immediate revocation."""
+    """Live sessions, standing credentials, and immediate revocation."""
     now = timezone.now()
-    active = (
-        IssuedCredential.objects.filter(status=IssuedCredential.Status.ACTIVE)
-        .select_related("officer")
-        .order_by("session_expires_at")
-    )
-    # A session whose window has passed but which has not made a request since
-    # is displayed as ended; it is consumed on its next request or here.
-    for credential in active:
+    # A credential whose validity window has passed but which has made no
+    # request since is displayed as ended; it is consumed on its next request
+    # or here.
+    for credential in IssuedCredential.objects.filter(status=IssuedCredential.Status.ACTIVE):
         if credential.session_expires_at and now >= credential.session_expires_at:
-            credential.consume("Session window elapsed. Marked consumed during live session review.")
-    active = (
+            credential.consume("Validity window elapsed. Marked consumed during live session review.")
+    base = (
         IssuedCredential.objects.filter(status=IssuedCredential.Status.ACTIVE)
         .select_related("officer")
         .order_by("session_expires_at")
     )
+    live = base.exclude(bound_session_key="")
+    signed_out = base.filter(bound_session_key="")
     pending = IssuedCredential.objects.filter(status=IssuedCredential.Status.ISSUED).select_related("officer")
     return render(
         request,
         "backoffice/live_sessions.html",
-        {"active": active, "pending": pending, "nav": "sessions"},
+        {"active": live, "signed_out": signed_out, "pending": pending, "nav": "sessions"},
     )
 
 

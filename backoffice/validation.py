@@ -121,6 +121,21 @@ def run_validation(filing: Filing) -> tuple[int, int]:
 
         if record.balance < 0:
             record_finding(record, "ERROR", "R-301", f"Account balance {record.balance} is negative.")
+        # The CRS User Guide (IVg) directs that a closed account is reported
+        # with a zero balance alongside the ClosedAccount attribute.
+        if record.closed_account and record.balance != 0:
+            record_finding(
+                record,
+                "WARNING",
+                "R-302",
+                f"Account is flagged closed but reports a balance of {record.balance}; "
+                "CRS expects a zero balance for a closed account.",
+            )
+        # NOTE: a missing structured last name is deliberately *not* a finding.
+        # The emitter falls back to FirstName 'NFN' with the full name as
+        # LastName, which the CRS User Guide (IIc) expressly permits, and
+        # warnings block submission here — so flagging it would halt every
+        # filing carrying only a free-text name.
         if record.opened_date and record.opened_date.year > filing.reporting_year:
             record_finding(
                 record,

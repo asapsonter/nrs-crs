@@ -1,7 +1,7 @@
 """Template context shared by both surfaces."""
 from __future__ import annotations
 
-from core import config
+from core import config, workhours
 from core.access import SUPERADMIN_CAPS, capabilities_for
 
 
@@ -14,10 +14,20 @@ def surface_context(request) -> dict:
         caps = set(SUPERADMIN_CAPS)
     else:
         caps = set()
+    # The header countdown runs to whichever comes first: today's working-day
+    # close or the end of the credential's validity window. An unlimited
+    # credential has neither clock, so no countdown is shown.
+    remaining = None
+    if credential and not credential.is_unlimited:
+        remaining = credential.remaining_seconds
+        to_close = workhours.seconds_to_day_close()
+        if to_close is not None:
+            remaining = min(remaining, to_close)
     return {
         "surface": getattr(request, "surface", "public"),
         "credential": credential,
-        "credential_remaining_seconds": credential.remaining_seconds if credential else None,
+        "credential_remaining_seconds": remaining,
+        "credential_valid_until": credential.session_expires_at if credential else None,
         "bo_caps": caps,
         "REPORTING_YEAR": config.CURRENT_REPORTING_YEAR,
     }

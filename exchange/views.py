@@ -26,6 +26,7 @@ from exchange.models import (
     StatusMessage,
 )
 from exchange.services import (
+    build_nil_packages,
     build_packages,
     days_to_exchange_deadline,
     generate_crs_xml,
@@ -99,6 +100,33 @@ def build(request):
         messages.success(request, f"{len(packages)} exchange package(s) built by partner jurisdiction.")
     else:
         messages.error(request, "No unpackaged approved records are available for activated partners.")
+    return redirect("/backoffice/exchange/")
+
+
+@require_cap(access.OPERATE_EXCHANGE)
+def build_nil(request):
+    """Build CRS703 nil returns for partners with nothing to exchange this year."""
+    if request.method != "POST":
+        return redirect("/backoffice/exchange/")
+    packages = build_nil_packages(config.CURRENT_REPORTING_YEAR)
+    if packages:
+        for package in packages:
+            _audit(
+                request,
+                "NIL_RETURN_BUILT",
+                package.message_ref_id,
+                f"CRS703 nil return built for {package.jurisdiction.name}.",
+                after=package.status,
+            )
+        messages.success(
+            request,
+            f"{len(packages)} nil return(s) built for partners with nothing to exchange this year.",
+        )
+    else:
+        messages.error(
+            request,
+            "Every activated partner already has a package this year or has records awaiting packaging.",
+        )
     return redirect("/backoffice/exchange/")
 
 

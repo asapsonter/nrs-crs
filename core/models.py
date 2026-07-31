@@ -96,11 +96,25 @@ def _random_block(length: int = 5) -> str:
     return "".join(secrets.choice(_CREDENTIAL_ALPHABET) for _ in range(length))
 
 
+def add_months(moment, months: int):
+    """The same wall-clock moment `months` calendar months later.
+
+    Days are clamped to the target month's length (31 Jan + 1 month = 28 Feb).
+    """
+    import calendar
+
+    month_index = moment.month - 1 + months
+    year = moment.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(moment.day, calendar.monthrange(year, month)[1])
+    return moment.replace(year=year, month=month, day=day)
+
+
 class IssuedCredentialManager(models.Manager):
     def issue(
         self,
         officer: OfficerProfile,
-        session_hours: float,
+        session_months: int,
     ) -> tuple["IssuedCredential", str]:
         """Create a credential and return it with the cleartext passcode.
 
@@ -119,7 +133,7 @@ class IssuedCredentialManager(models.Manager):
             roles=officer.roles,
             username=username,
             passcode_hash=make_password(passcode),
-            session_hours=session_hours,
+            session_months=session_months,
             expires_if_unused_at=timezone.now()
             + timezone.timedelta(hours=config.CREDENTIAL_UNUSED_VALIDITY_HOURS),
         )
@@ -127,13 +141,17 @@ class IssuedCredentialManager(models.Manager):
 
 
 class IssuedCredential(RoleListMixin, models.Model):
-    """A single-use, time-boxed credential for the Supervision Centre.
+    """A time-boxed credential for the Supervision Centre.
 
     Lifecycle: ISSUED at creation; ACTIVE at first successful login, when the
-    session window is fixed; CONSUMED when that session ends for any reason;
-    EXPIRED if never used within the issuance validity window; REVOKED by the
-    Super Admin. A credential authenticates exactly one login and carries a
-    snapshot of the user's roles.
+    validity window (whole months) is fixed; CONSUMED when that window ends
+    or the Super Admin's live-session sweep retires it; EXPIRED if never used
+    within the issuance validity window; REVOKED by the Super Admin.
+
+    Within its validity the credential admits repeated daily sign-ins during
+    working hours (core.workhours), but only one live session at a time:
+    signing out unbinds the session and leaves the credential ACTIVE for the
+    next working day. It carries a snapshot of the user's roles.
     """
 
     class Status(models.TextChoices):
@@ -147,7 +165,9 @@ class IssuedCredential(RoleListMixin, models.Model):
     roles = models.CharField("Roles", max_length=200, blank=True, default="")
     username = models.CharField(max_length=40, unique=True)
     passcode_hash = models.CharField(max_length=200)
-    session_hours = models.DecimalField(max_digits=5, decimal_places=2)
+    # Validity in whole months; 0 means unlimited (no expiry and no
+    # working-hours confinement).
+    session_months = models.PositiveSmallIntegerField(default=1)
     issued_at = models.DateTimeField(auto_now_add=True)
     expires_if_unused_at = models.DateTimeField()
     first_used_at = models.DateTimeField(null=True, blank=True)
@@ -174,6 +194,17 @@ class IssuedCredential(RoleListMixin, models.Model):
         return check_password(raw, self.passcode_hash)
 
     @property
+    def is_unlimited(self) -> bool:
+        """Unlimited validity: no expiry and no working-hours confinement."""
+        return int(self.session_months) == 0
+
+    @property
+    def validity_display(self) -> str:
+        if self.is_unlimited:
+            return "Unlimited"
+        return f"{self.session_months} month{'s' if self.session_months != 1 else ''}"
+
+    @property
     def remaining_seconds(self) -> int:
         if self.status != self.Status.ACTIVE or not self.session_expires_at:
             return 0
@@ -193,10 +224,16 @@ class IssuedCredential(RoleListMixin, models.Model):
             )
 
     def activate(self, session_key: str, user) -> None:
-        """First successful login: bind to the session and fix the window."""
+        """Successful login: bind to the session; first use fixes the window.
+
+        The validity window (whole calendar months) is set once, at first
+        use. Later sign-ins within the window simply bind the new session.
+        """
         now = timezone.now()
-        self.first_used_at = now
-        self.session_expires_at = now + timezone.timedelta(hours=float(self.session_hours))
+        if self.first_used_at is None:
+            self.first_used_at = now
+            if not self.is_unlimited:
+                self.session_expires_at = add_months(now, int(self.session_months))
         self.status = self.Status.ACTIVE
         # The field is stored for the audit trail; never allow a null value to
         # reach the database, which would raise an integrity error on save.
@@ -204,8 +241,25 @@ class IssuedCredential(RoleListMixin, models.Model):
         self.user = user
         self.save()
 
+    def unbind(self, reason: str) -> None:
+        """End the current live session without ending the validity window.
+
+        The credential stays ACTIVE and admits a fresh sign-in the next
+        working day (or later the same day).
+        """
+        self.bound_session_key = ""
+        self.save(update_fields=["bound_session_key"])
+        AuditLog.record(
+            actor_name=self.officer.name,
+            actor_role=self.role_display,
+            action="SESSION_ENDED",
+            target=self.username,
+            detail=reason,
+            credential=self,
+        )
+
     def consume(self, reason: str) -> None:
-        """End of the one permitted session. The credential can never log in again."""
+        """End of the validity window. The credential can never log in again."""
         self.status = self.Status.CONSUMED
         self.save(update_fields=["status"])
         AuditLog.record(

@@ -3,7 +3,7 @@
 {% block content %}
 {% include "portal/deadline_banner.html" %}
 <h1>Upload CRS XML</h1>
-<p class="page-sub">The file is validated against the NRS simplified CRS filing schema. Malformed files are rejected with line-level messages.</p>
+<p class="page-sub">Upload an official CRS XML Schema v2.0 document (CRS_OECD, as circulated in the FI sensitization pack) or the NRS simplified filing form &mdash; the format is detected automatically. Malformed files are rejected with per-record messages, and the message header from a CRS_OECD document is carried onto the filing.</p>
 
 {% if errors %}
 <div class="error-text">

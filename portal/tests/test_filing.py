@@ -3,14 +3,17 @@ from __future__ import annotations
 
 import datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
+from django.contrib.auth import get_user_model
+from django.test import Client
 
 from backoffice.validation import run_validation
 from core import config
 from exchange.models import PartnerJurisdiction
 from exchange.services import next_doc_ref_id
-from portal.models import AccountReport, Filing, PortalUser, ReportingFI
+from portal.models import AccountReport, Filing, PortalUser, ReportingFI, ValidationFinding
 from portal.xml_ingest import parse_crs_upload
 
 pytestmark = pytest.mark.django_db
@@ -220,3 +223,204 @@ class TestXmlIngestion:
         xml = f'<CRSFiling year="{YEAR - 3}"><ReportingFI tin="1" name="X"/><AccountReport><HolderName>A</HolderName><ResCountry>GB</ResCountry><AccountNumber>1</AccountNumber><Balance>1</Balance></AccountReport></CRSFiling>'
         result = parse_crs_upload(xml.encode(), YEAR)
         assert not result.ok
+
+
+@pytest.fixture
+def portal_client(rfi) -> Client:
+    email = "pu@zenithtrust.ng"
+    user = get_user_model().objects.create_user(username=email, password="Secret123!")
+    PortalUser.objects.create(
+        user=user,
+        rfi=rfi,
+        display_name="Ngozi Bello",
+        designation="Head, Regulatory Reporting",
+        role=PortalUser.Role.CHECKER,
+        status=PortalUser.Status.ACTIVE,
+        is_primary_user=True,
+        must_change_password=False,
+    )
+    client = Client()
+    response = client.post("/portal/login/", {"email": email, "password": "Secret123!"})
+    assert response.status_code == 302
+    return client
+
+
+class TestReturnedFilingEditing:
+    """A filing the NRS returned ("rejected") must be editable and resubmittable."""
+
+    _FORM = {
+        "holder_name": "Chukwu Emeka",
+        "holder_type": "INDIVIDUAL",
+        "residence_country": "GB",
+        "holder_address": "1 King Street, London",
+        "foreign_tin": "QQ123456C",
+        "self_certification": "OBTAINED",
+        "account_number": "ACC-0001",
+        "currency": "GBP",
+        "balance": "950000.00",
+    }
+
+    def test_unflagged_record_amendable_when_returned(self, rfi, partners, portal_client):
+        filing = make_filing(rfi, status=Filing.Status.RETURNED, return_reason="Header mismatch.")
+        record = make_record(filing)
+        # Only a file-level finding: no record is individually flagged.
+        ValidationFinding.objects.create(
+            filing=filing, severity="ERROR", code="F-101", message="Header mismatch."
+        )
+        response = portal_client.post(
+            f"/portal/filings/{filing.pk}/records/{record.pk}/", self._FORM
+        )
+        assert response.status_code == 302
+        record.refresh_from_db()
+        assert record.superseded is True
+        replacement = filing.account_reports.get(superseded=False)
+        assert replacement.doc_type_indic == AccountReport.DocTypeIndic.OECD2
+        assert replacement.corr_doc_ref_id == record.doc_ref_id
+
+    def test_detail_offers_amend_link_for_unflagged_records(self, rfi, partners, portal_client):
+        filing = make_filing(rfi, status=Filing.Status.RETURNED, return_reason="See notes.")
+        record = make_record(filing)
+        html = portal_client.get(f"/portal/filings/{filing.pk}/").content.decode()
+        assert f"/portal/filings/{filing.pk}/records/{record.pk}/" in html
+        assert "Amend" in html
+
+    def test_resubmit_allowed_when_only_file_level_findings(self, rfi, partners, portal_client):
+        filing = make_filing(rfi, status=Filing.Status.RETURNED, return_reason="Header mismatch.")
+        make_record(filing)
+        ValidationFinding.objects.create(
+            filing=filing, severity="ERROR", code="F-101", message="Header mismatch."
+        )
+        response = portal_client.post(f"/portal/filings/{filing.pk}/resubmit/")
+        assert response.status_code == 302
+        filing.refresh_from_db()
+        assert filing.status == Filing.Status.SUBMITTED
+
+    def test_resubmit_blocked_while_flagged_record_uncorrected(self, rfi, partners, portal_client):
+        filing = make_filing(rfi, status=Filing.Status.RETURNED, return_reason="Bad TIN.")
+        record = make_record(filing)
+        ValidationFinding.objects.create(
+            filing=filing,
+            account_report=record,
+            severity="ERROR",
+            code="R-102",
+            message="TIN malformed.",
+        )
+        response = portal_client.post(f"/portal/filings/{filing.pk}/resubmit/")
+        assert response.status_code == 302
+        filing.refresh_from_db()
+        assert filing.status == Filing.Status.RETURNED
+
+    def test_flagged_record_correction_then_resubmit(self, rfi, partners, portal_client):
+        filing = make_filing(rfi, status=Filing.Status.RETURNED, return_reason="Bad TIN.")
+        record = make_record(filing)
+        ValidationFinding.objects.create(
+            filing=filing,
+            account_report=record,
+            severity="ERROR",
+            code="R-102",
+            message="TIN malformed.",
+        )
+        portal_client.post(f"/portal/filings/{filing.pk}/records/{record.pk}/", self._FORM)
+        response = portal_client.post(f"/portal/filings/{filing.pk}/resubmit/")
+        assert response.status_code == 302
+        filing.refresh_from_db()
+        assert filing.status == Filing.Status.SUBMITTED
+
+
+class TestOecdXmlSamples:
+    """The 2026 FI Sensitization UAT samples (official CRS_OECD v2.0 form)."""
+
+    SAMPLES = Path(__file__).resolve().parent / "samples"
+
+    @staticmethod
+    def _read(name: str) -> bytes:
+        return (TestOecdXmlSamples.SAMPLES / name).read_bytes()
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "2026_New_Sample_UAT_CRS_XML_Test1_NG-GB.xml",
+            "2026_New_Sample_UAT_CRS_XML_Test1_NG-BR.xml",
+            "2026_Ammended_Sample_UAT_CRS_XML_Test1_NG-GB.xml",
+            "2026_Ammended_Sample_UAT_CRS_XML_Test1_NG-BR.xml",
+        ],
+    )
+    def test_sample_parses(self, name):
+        result = parse_crs_upload(self._read(name), YEAR)
+        assert result.ok, result.errors
+        assert result.year == YEAR
+        assert len(result.records) == 1
+
+    def test_new_sample_fields_are_captured(self):
+        result = parse_crs_upload(self._read("2026_New_Sample_UAT_CRS_XML_Test1_NG-GB.xml"), YEAR)
+        assert result.ok, result.errors
+        assert result.message_type_indic == "CRS701"
+        assert result.receiving_country == "GB"
+        assert result.message_ref_id.startswith("NG2025GB")
+        record = result.records[0]
+        assert record.holder_type == "ORGANISATION"
+        assert record.holder_name == "AccountReport_ORG_Name_1"
+        assert record.acct_holder_type == "CRS102"
+        assert record.residence_country == "GB"
+        assert record.foreign_tin == "76-2347867654"
+        assert record.account_number == "613657467"
+        assert record.acct_number_type == "OECD605"
+        assert record.closed_account is False and record.dormant_account is False
+        assert record.currency == "USD"
+        assert record.balance == Decimal("150000000.00")
+        # CRS501 dividends and CRS502 interest payments.
+        assert record.dividends == Decimal("120010.00")
+        assert record.interest == Decimal("120010.00")
+        assert record.holder_city == "City_AccountReport_ORG_1"
+        assert record.holder_street == "Street_AccountReport_ORG_1"
+        assert record.address_country == "NG"
+
+    def test_amended_sample_carries_correction_header(self):
+        result = parse_crs_upload(
+            self._read("2026_Ammended_Sample_UAT_CRS_XML_Test1_NG-GB.xml"), YEAR
+        )
+        assert result.ok, result.errors
+        assert result.message_type_indic == "CRS702"
+
+    def test_upload_creates_filing_with_header_and_full_record(self, rfi, partners, portal_client):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        name = "2026_New_Sample_UAT_CRS_XML_Test1_NG-GB.xml"
+        response = portal_client.post(
+            "/portal/filings/upload/",
+            {"crs_file": SimpleUploadedFile(name, self._read(name), content_type="text/xml")},
+        )
+        assert response.status_code == 302, getattr(response, "context", None)
+        filing = Filing.objects.latest("pk")
+        assert filing.kind == Filing.Kind.XML_UPLOAD
+        assert filing.message_type == "CRS701"
+        assert filing.receiving_country == "GB"
+        assert filing.message_reference.startswith("NG2025GB")
+        record = filing.account_reports.get()
+        assert record.holder_type == "ORGANISATION"
+        assert record.acct_holder_type == "CRS102"
+        assert record.currency == "USD"
+        assert record.acct_number_type == "OECD605"
+        assert record.holder_city == "City_AccountReport_ORG_1"
+
+    def test_wrong_reporting_period_rejected(self):
+        xml = self._read("2026_New_Sample_UAT_CRS_XML_Test1_NG-GB.xml").decode()
+        xml = xml.replace("<crs:ReportingPeriod>2025-12-31</crs:ReportingPeriod>",
+                          "<crs:ReportingPeriod>2022-12-31</crs:ReportingPeriod>")
+        result = parse_crs_upload(xml.encode(), YEAR)
+        assert not result.ok
+        assert any("2022" in error for error in result.errors)
+
+    def test_organisation_without_acct_holder_type_rejected(self):
+        xml = self._read("2026_New_Sample_UAT_CRS_XML_Test1_NG-GB.xml").decode()
+        xml = xml.replace("<crs:AcctHolderType>CRS102</crs:AcctHolderType>", "")
+        result = parse_crs_upload(xml.encode(), YEAR)
+        assert not result.ok
+        assert any("AcctHolderType" in error for error in result.errors)
+
+    def test_nil_indicator_rejected_for_upload(self):
+        xml = self._read("2026_New_Sample_UAT_CRS_XML_Test1_NG-GB.xml").decode()
+        xml = xml.replace("CRS701", "CRS703")
+        result = parse_crs_upload(xml.encode(), YEAR)
+        assert not result.ok
+        assert any("Nil Return" in error for error in result.errors)

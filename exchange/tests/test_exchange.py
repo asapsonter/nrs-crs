@@ -9,7 +9,7 @@ from django.test import Client
 from core import config
 from core.models import IssuedCredential, OfficerProfile, Roles
 from exchange.models import ExchangePackage, PartnerJurisdiction, RecordError, StatusMessage
-from exchange.services import build_packages, generate_crs_xml, next_message_ref_id
+from exchange.services import build_nil_packages, build_packages, generate_crs_xml, next_message_ref_id
 from portal.models import AccountReport, Filing, ReportingFI
 
 pytestmark = pytest.mark.django_db
@@ -109,6 +109,57 @@ class TestPackaging:
         assert xml.count("<crs:AccountReport>") == 1
 
 
+class TestNilReturns:
+    def test_nil_built_only_for_empty_corridors(self, partners, rfi):
+        accepted_filing_with_records(rfi, ["GB"])
+        build_packages(YEAR)
+        nil_packages = build_nil_packages(YEAR)
+        codes = {package.jurisdiction.code for package in nil_packages}
+        # GB exchanged data; every other activated partner gets a CRS703.
+        assert "GB" not in codes
+        assert codes == {code for code, *_ in config.PARTNER_JURISDICTIONS} - {"GB"}
+        for package in nil_packages:
+            assert package.message_type == "CRS703"
+            assert package.records.count() == 0
+            assert "<crs:MessageTypeIndic>CRS703</crs:MessageTypeIndic>" in package.xml_content
+            assert "SendingCompanyIN" not in package.xml_content
+            assert "CrsBody" not in package.xml_content
+
+    def test_corridor_with_unpackaged_records_gets_no_nil(self, partners, rfi):
+        accepted_filing_with_records(rfi, ["GB"])
+        nil_packages = build_nil_packages(YEAR)
+        assert "GB" not in {package.jurisdiction.code for package in nil_packages}
+
+    def test_accepted_nil_filing_advances_to_in_exchange(self, partners, rfi):
+        filing = Filing.objects.create(
+            reference=f"FIL-{YEAR}-NIL01",
+            rfi=rfi,
+            reporting_year=YEAR,
+            kind=Filing.Kind.NIL,
+            status=Filing.Status.ACCEPTED,
+        )
+        build_nil_packages(YEAR)
+        filing.refresh_from_db()
+        assert filing.status == Filing.Status.IN_EXCHANGE
+
+    def test_nil_build_is_idempotent(self, partners, rfi):
+        first = build_nil_packages(YEAR)
+        assert first
+        assert build_nil_packages(YEAR) == []
+
+    def test_generator_refuses_records_on_nil_package(self, partners, rfi):
+        filing = accepted_filing_with_records(rfi, ["GB"])
+        package = ExchangePackage.objects.create(
+            jurisdiction=PartnerJurisdiction.objects.get(code="GB"),
+            reporting_year=YEAR,
+            message_ref_id=next_message_ref_id("GB", YEAR),
+            message_type="CRS703",
+        )
+        package.records.set(filing.account_reports.all())
+        with pytest.raises(ValueError):
+            generate_crs_xml(package)
+
+
 class TestCorrectionCycle:
     def _transmit_and_get_record_errors(self, client: Client, package: ExchangePackage) -> None:
         for _ in range(8):
@@ -142,8 +193,11 @@ class TestCorrectionCycle:
         # The lineage resolves back to the original record.
         original = AccountReport.objects.get(doc_ref_id=corrected.corr_doc_ref_id)
         assert original.superseded
-        assert f"<crs:CorrDocRefId>{original_doc_ref}</crs:CorrDocRefId>" in correction.xml_content
-        assert "<crs:DocTypeIndic>OECD2</crs:DocTypeIndic>" in correction.xml_content
+        # DocSpec children are in the stf namespace, not crs.
+        assert f"<stf:CorrDocRefId>{original_doc_ref}</stf:CorrDocRefId>" in correction.xml_content
+        assert "<stf:DocTypeIndic>OECD2</stf:DocTypeIndic>" in correction.xml_content
+        # The ReportingFI is resent unmodified under OECD0.
+        assert "<stf:DocTypeIndic>OECD0</stf:DocTypeIndic>" in correction.xml_content
         error.refresh_from_db()
         assert error.resolved
 

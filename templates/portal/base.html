@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}NRS AEOI-CRS Portal{% endblock %}</title>
+<link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
 <link rel="stylesheet" href="{% static 'css/portal.css' %}">
 </head>
 <body>
@@ -65,9 +66,12 @@
 <header class="pt-header">
   <div class="bar">
     <div class="brand">
-      <a href="/" title="Return to the home page">
-        <div class="org">NRS AEOI-CRS Portal</div>
-        <div class="sys">Reporting Financial Institutions</div>
+      <a href="/" title="Return to the home page" class="brand-lockup">
+        {% include "_nrs_logo.html" with logo_class="sm" %}
+        <span class="brand-lockup-text">
+          <span class="org">AEOI-CRS Portal</span>
+          <span class="sys">Reporting Financial Institutions</span>
+        </span>
       </a>
     </div>
     <div class="user-info">

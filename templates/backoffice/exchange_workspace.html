@@ -9,10 +9,18 @@
   <h2 style="margin-top: 0;">Package builder</h2>
   <p class="muted">{{ eligible_records }} approved record(s) are awaiting packaging. Building sorts them by account holder residence jurisdiction into one package per activated partner.</p>
   {% if 'operate_exchange' in bo_caps %}
-  <form method="post" action="/backoffice/exchange/build/">
-    {% csrf_token %}
-    <button type="submit" class="btn" {% if not eligible_records %}disabled{% endif %}>Build exchange packages</button>
-  </form>
+  <div class="actions-row">
+    <form method="post" action="/backoffice/exchange/build/">
+      {% csrf_token %}
+      <button type="submit" class="btn" {% if not eligible_records %}disabled{% endif %}>Build exchange packages</button>
+    </form>
+    <form method="post" action="/backoffice/exchange/build-nil/"
+          onsubmit="return confirm('Build CRS703 nil returns for every activated partner with nothing to exchange this year?');">
+      {% csrf_token %}
+      <button type="submit" class="btn secondary">Build nil returns</button>
+    </form>
+  </div>
+  <p class="muted">A nil return (CRS703) is sent to each activated partner with no package and no records awaiting packaging for the year, once data packaging is complete.</p>
   {% else %}
   <p class="muted">You hold read-only access to exchange data.</p>
   {% endif %}

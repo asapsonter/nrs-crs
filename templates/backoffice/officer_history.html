@@ -27,7 +27,7 @@
       <td class="mono">{{ credential.username }}</td>
       <td>{{ credential.role_display }}</td>
       <td>{{ credential.issued_at|date:"Y-m-d H:i" }}</td>
-      <td>{{ credential.session_hours }} h</td>
+      <td>{% if credential.is_unlimited %}Unlimited{% else %}{{ credential.session_months }} mo{% endif %}</td>
       <td>{{ credential.first_used_at|date:"Y-m-d H:i"|default:"never used" }}</td>
       <td>{{ credential.session_expires_at|date:"Y-m-d H:i"|default:"-" }}</td>
       <td>

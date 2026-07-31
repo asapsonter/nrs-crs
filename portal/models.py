@@ -309,6 +309,28 @@ class Filing(models.Model):
         )
 
 
+#: Placeholder the CRS User Guide (IIc) sanctions when a Reporting FI does not
+#: hold a first name for an individual.
+NO_FIRST_NAME = "NFN"
+
+
+def crs_name_parts(first_name: str, last_name: str, full_name: str) -> tuple[str, str]:
+    """Resolve a CRS NamePerson_Type FirstName/LastName pair.
+
+    ``FirstName`` and ``LastName`` are both Validation elements, so every
+    individual must yield two non-empty values. Where the record only carries a
+    single free-text name we do *not* guess at a split — the User Guide allows
+    ``NFN`` for an unknown first name and allows LastName to carry a free-format
+    name, which keeps the output truthful about what the FI actually reported.
+    """
+    first = (first_name or "").strip()
+    last = (last_name or "").strip()
+    if last:
+        return first or NO_FIRST_NAME, last
+    whole = (full_name or "").strip()
+    return first or NO_FIRST_NAME, whole or NO_FIRST_NAME
+
+
 class AccountReport(models.Model):
     """One reportable account within a filing.
 
@@ -328,6 +350,14 @@ class AccountReport(models.Model):
         CRS102 = "CRS102", "CRS102 CRS Reportable Person"
         CRS103 = "CRS103", "CRS103 Passive NFE that is a CRS Reportable Person"
 
+    class AcctNumberType(models.TextChoices):
+        """CRS AccountNumber @AcctNumberType (User Guide IVd)."""
+        OECD601 = "OECD601", "OECD601 IBAN"
+        OECD602 = "OECD602", "OECD602 Other Bank Account Number"
+        OECD603 = "OECD603", "OECD603 ISIN"
+        OECD604 = "OECD604", "OECD604 Other Securities Information Number"
+        OECD605 = "OECD605", "OECD605 Other (e.g. insurance contract)"
+
     class SelfCertification(models.TextChoices):
         """Due-diligence status of the account holder self-certification."""
         OBTAINED = "OBTAINED", "Obtained and validated"
@@ -340,6 +370,13 @@ class AccountReport(models.Model):
     doc_type_indic = models.CharField(max_length=6, choices=DocTypeIndic.choices, default=DocTypeIndic.OECD1)
 
     holder_name = models.CharField("Account holder name", max_length=200)
+    # CRS NamePerson_Type requires FirstName and LastName for individuals
+    # (User Guide IIc). Both are Validation elements, so an individual record
+    # cannot be rendered from `holder_name` alone. When these are blank the
+    # emitter falls back to NFN / free-format last name, which the User Guide
+    # expressly permits.
+    holder_first_name = models.CharField("First name", max_length=200, blank=True, default="")
+    holder_last_name = models.CharField("Last name", max_length=200, blank=True, default="")
     holder_type = models.CharField(
         max_length=12,
         choices=[("INDIVIDUAL", "Individual"), ("ORGANISATION", "Entity")],
@@ -356,12 +393,28 @@ class AccountReport(models.Model):
     )
 
     # CRS AccountHolder Address (mandatory in the CRS XML schema).
+    # `holder_address` backs AddressFree; the components below back AddressFix,
+    # which the User Guide (IId) says should be used for all CRS reporting
+    # unless the parts of the address cannot be determined. `holder_city` is
+    # the Validation element within AddressFix, so it gates the choice.
     holder_address = models.CharField("Account holder address", max_length=300, blank=True, default="")
     address_country = models.CharField("Address country", max_length=2, blank=True, default="")
+    holder_street = models.CharField("Street", max_length=200, blank=True, default="")
+    holder_building_identifier = models.CharField("Building", max_length=200, blank=True, default="")
+    holder_post_code = models.CharField("Post code", max_length=200, blank=True, default="")
+    holder_city = models.CharField("City", max_length=200, blank=True, default="")
+    holder_country_subentity = models.CharField("State / region", max_length=200, blank=True, default="")
 
-    # CRS BirthInfo (individual holders).
+    # CRS BirthInfo (individual holders). CountryInfo is a choice between a
+    # current jurisdiction code and a former jurisdiction name; the User Guide
+    # (IIf) asks for one of them whenever place of birth is reported.
     birth_date = models.DateField("Date of birth", null=True, blank=True)
     birth_city = models.CharField("City of birth", max_length=120, blank=True, default="")
+    birth_city_subentity = models.CharField("Birth city subentity", max_length=200, blank=True, default="")
+    birth_country_code = models.CharField("Country of birth", max_length=2, blank=True, default="")
+    birth_former_country_name = models.CharField(
+        "Former country of birth", max_length=200, blank=True, default=""
+    )
 
     # Due-diligence: self-certification status per CRS Regulations 2019.
     self_certification = models.CharField(
@@ -369,6 +422,13 @@ class AccountReport(models.Model):
     )
 
     account_number = models.CharField(max_length=40)
+    acct_number_type = models.CharField(
+        "Account number type", max_length=7, choices=AcctNumberType.choices, blank=True, default=""
+    )
+    # CRS AccountNumber attributes. ClosedAccount is "(Optional) Mandatory" in
+    # the User Guide (IVd) and pairs with a zero balance (IVg).
+    closed_account = models.BooleanField("Account closed in the reporting period", default=False)
+    dormant_account = models.BooleanField("Account dormant", default=False)
     balance = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
     currency = models.CharField(max_length=3, default="NGN")
     dividends = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
@@ -404,6 +464,11 @@ class AccountReport(models.Model):
     def address_country_code(self) -> str:
         """Address country, falling back to residence for the CRS Address."""
         return self.address_country or self.residence_country
+
+    @property
+    def crs_name(self) -> tuple[str, str]:
+        """The CRS FirstName/LastName pair for an individual holder."""
+        return crs_name_parts(self.holder_first_name, self.holder_last_name, self.holder_name)
 
     @property
     def is_complete(self) -> bool:
@@ -455,10 +520,18 @@ class ControllingPerson(models.Model):
         AccountReport, on_delete=models.CASCADE, related_name="controlling_persons"
     )
     name = models.CharField("Controlling person name", max_length=200)
+    # A controlling person is reported as a PersonParty_Type, so the same
+    # FirstName/LastName Validation pair applies as for individual holders.
+    first_name = models.CharField("First name", max_length=200, blank=True, default="")
+    last_name = models.CharField("Last name", max_length=200, blank=True, default="")
     residence_country = models.CharField("Residence jurisdiction", max_length=2)
     tin = models.CharField("TIN", max_length=40, blank=True, default="")
     address = models.CharField("Address", max_length=300, blank=True, default="")
+    city = models.CharField("City", max_length=200, blank=True, default="")
+    address_country = models.CharField("Address country", max_length=2, blank=True, default="")
     birth_date = models.DateField("Date of birth", null=True, blank=True)
+    birth_city = models.CharField("City of birth", max_length=120, blank=True, default="")
+    birth_country_code = models.CharField("Country of birth", max_length=2, blank=True, default="")
     ctrlg_person_type = models.CharField(
         "Controlling person type", max_length=6, choices=CtrlgPersonType.choices,
         default=CtrlgPersonType.CRS801,
@@ -470,6 +543,16 @@ class ControllingPerson(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.get_ctrlg_person_type_display()})"
+
+    @property
+    def crs_name(self) -> tuple[str, str]:
+        """The CRS FirstName/LastName pair for this controlling person."""
+        return crs_name_parts(self.first_name, self.last_name, self.name)
+
+    @property
+    def address_country_code(self) -> str:
+        """Address country, falling back to residence for the CRS Address."""
+        return self.address_country or self.residence_country
 
 
 class ValidationFinding(models.Model):

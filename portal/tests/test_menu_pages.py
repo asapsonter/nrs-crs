@@ -582,7 +582,9 @@ def test_generated_xml_includes_crs_holder_structure(maker_client: Client) -> No
     xml = packages[0].xml_content
     assert "<crs:Address>" in xml
     assert "<cfc:AddressFree>1 Market St, London</cfc:AddressFree>" in xml
-    assert 'crsAcctHolderType="CRS101"' in xml
+    # AcctHolderType is a sibling element of Organisation, not an attribute.
+    assert "<crs:AcctHolderType>CRS101</crs:AcctHolderType>" in xml
+    assert "crsAcctHolderType" not in xml
     assert "<crs:ControllingPerson>" in xml
     assert "<crs:CtrlgPersonType>CRS801</crs:CtrlgPersonType>" in xml
     assert "John Owner" in xml

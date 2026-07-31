@@ -1,0 +1,11 @@
+{% comment %}
+Official NRS lockup per the Brand Essentials sheet: grey NRS wordmark over a
+baseline rule with a Prosperity Red chip, hairline divider, and the service
+name stacked in red. Variants via logo_class: "sm" (compact), "on-dark"
+(charcoal surfaces). Usage:
+  {% include "_nrs_logo.html" with logo_class="sm on-dark" %}
+{% endcomment %}
+<span class="nrs-logo{% if logo_class %} {{ logo_class }}{% endif %}" role="img" aria-label="Nigeria Revenue Service">
+  <span class="nrs-logo-mark" aria-hidden="true">NRS<span class="nrs-logo-rule"></span></span>
+  <span class="nrs-logo-name" aria-hidden="true">Nigeria<br>Revenue<br>Service</span>
+</span>

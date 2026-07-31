@@ -58,7 +58,11 @@ class ExchangePackage(models.Model):
     message_ref_id = models.CharField(max_length=40, unique=True)
     message_type = models.CharField(
         max_length=8,
-        choices=[("CRS701", "CRS701 New data"), ("CRS702", "CRS702 Corrections")],
+        choices=[
+            ("CRS701", "CRS701 New data"),
+            ("CRS702", "CRS702 Corrections"),
+            ("CRS703", "CRS703 Nil return"),
+        ],
         default="CRS701",
     )
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.BUILT)

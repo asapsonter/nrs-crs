@@ -17,6 +17,7 @@ urlpatterns = [
     path("compliance/", views_supervision.compliance),
     path("exchange/", exchange_views.workspace),
     path("exchange/build/", exchange_views.build),
+    path("exchange/build-nil/", exchange_views.build_nil),
     path("exchange/packages/<int:package_id>/", exchange_views.package_detail),
     path("exchange/packages/<int:package_id>/advance/", exchange_views.package_advance),
     path("exchange/packages/<int:package_id>/partner-response/", exchange_views.package_partner_response),

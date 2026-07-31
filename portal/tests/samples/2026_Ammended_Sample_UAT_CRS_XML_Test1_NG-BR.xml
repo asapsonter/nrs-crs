@@ -1,0 +1,120 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<crs:CRS_OECD xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:crs="urn:oecd:ties:crs:v2" xmlns:ftc="urn:oecd:ties:fatca:v1" xmlns:cfc="urn:oecd:ties:commontypesfatcacrs:v2" xmlns:stf="urn:oecd:ties:crsstf:v5" xmlns:iso="urn:oecd:ties:isocrstypes:v1" version="2.0">
+  <crs:MessageSpec>
+    <crs:TransmittingCountry>NG</crs:TransmittingCountry>
+    <crs:ReceivingCountry>BR</crs:ReceivingCountry>
+    <crs:MessageType>CRS</crs:MessageType>
+    <crs:MessageRefId>NG2025BRGUID035a2339e-6508-43e1-adac-NGA-12</crs:MessageRefId>
+    <crs:MessageTypeIndic>CRS702</crs:MessageTypeIndic>
+    <crs:CorrMessageRefId>NG2025BRGUID035a2339e-6508-43e1-adac-NGA-1</crs:CorrMessageRefId>
+    <crs:ReportingPeriod>2025-12-31</crs:ReportingPeriod>
+    <crs:Timestamp>2026-03-31T00:00:00</crs:Timestamp>
+  </crs:MessageSpec>
+  <crs:CrsBody>
+    <crs:ReportingFI>
+      <crs:ResCountryCode>NG</crs:ResCountryCode>
+      <crs:ResCountryCode>NG</crs:ResCountryCode>
+      <crs:IN issuedBy="BR" INType="FirstType">123-2358984</crs:IN>
+      <crs:IN issuedBy="US" INType="SecondType">Second_IN</crs:IN>
+      <crs:Name nameType="OECD202">MY bank</crs:Name>
+      <crs:Name nameType="OECD202">MY bank 2</crs:Name>
+      <crs:Address legalAddressType="OECD302">
+        <cfc:CountryCode>NG</cfc:CountryCode>
+        <cfc:AddressFix>
+          <cfc:Street>Street_ReportingFI</cfc:Street>
+          <cfc:BuildingIdentifier>BuildingIdentifier_ReportingFI</cfc:BuildingIdentifier>
+          <cfc:SuiteIdentifier>SuiteIdentifier_ReportingFI</cfc:SuiteIdentifier>
+          <cfc:FloorIdentifier>FloorIdentifier_ReportingFI</cfc:FloorIdentifier>
+          <cfc:DistrictName>DistrictName_ReportingFI</cfc:DistrictName>
+          <cfc:POB>POB_ReportingFI</cfc:POB>
+          <cfc:PostCode>PostCode_ReportingFI</cfc:PostCode>
+          <cfc:City>City_ReportingFI</cfc:City>
+          <cfc:CountrySubentity>CountrySubentity_ReportingFI</cfc:CountrySubentity>
+        </cfc:AddressFix>
+        <cfc:AddressFree>MyAddressFree_ReportingFI</cfc:AddressFree>
+      </crs:Address>
+      <crs:Address legalAddressType="OECD302">
+        <cfc:CountryCode>NG</cfc:CountryCode>
+        <cfc:AddressFix>
+          <cfc:Street>Street_ReportingFI_2</cfc:Street>
+          <cfc:BuildingIdentifier>BuildingIdentifier_ReportingFI_2</cfc:BuildingIdentifier>
+          <cfc:SuiteIdentifier>SuiteIdentifier_ReportingFI_2</cfc:SuiteIdentifier>
+          <cfc:FloorIdentifier>FloorIdentifier_ReportingFI_2</cfc:FloorIdentifier>
+          <cfc:DistrictName>DistrictName_ReportingFI_2</cfc:DistrictName>
+          <cfc:POB>POB_ReportingFI_2</cfc:POB>
+          <cfc:PostCode>PostCode_ReportingFI_2</cfc:PostCode>
+          <cfc:City>City_ReportingFI_2</cfc:City>
+          <cfc:CountrySubentity>CountrySubentity_ReportingFI_2</cfc:CountrySubentity>
+        </cfc:AddressFix>
+        <cfc:AddressFree>MyAddressFree_ReportingFI_2</cfc:AddressFree>
+      </crs:Address>
+      <crs:DocSpec>
+        <stf:DocTypeIndic>OECD11</stf:DocTypeIndic>
+        <stf:DocRefId>NG2025-AUTO.20231231153420850GUIDfd829fd3-e6fa-46b2-be4b-eed1908-NGA-BR12</stf:DocRefId>
+        <stf:CorrDocRefId>NG2025-AUTO.20231231153420850GUIDfd829fd3-e6fa-46b2-be4b-eed1908-NGA-BR1</stf:CorrDocRefId>
+        <stf:CorrMessageRefId>NG2025BRGUID035a2339e-6508-43e1-adac-NGA-1</stf:CorrMessageRefId>
+      </crs:DocSpec>
+    </crs:ReportingFI>
+    <crs:ReportingGroup>
+      <crs:AccountReport>
+        <crs:DocSpec>
+          <stf:DocTypeIndic>OECD11</stf:DocTypeIndic>
+          <stf:DocRefId>NG2025-AUTO.20231231153420850GUIDe7929e40-ac80-40c7-8cf5-9295462-NGA-BR22</stf:DocRefId>
+          <stf:CorrDocRefId>NG2025-AUTO.20231231153420850GUIDe7929e40-ac80-40c7-8cf5-9295462-NGA-BR2</stf:CorrDocRefId>
+          <stf:CorrMessageRefId>NG2025BRGUID035a2339e-6508-43e1-adac-NGA-1</stf:CorrMessageRefId>
+        </crs:DocSpec>
+        <crs:AccountNumber AcctNumberType="OECD605" UndocumentedAccount="false" ClosedAccount="false" DormantAccount="false">6136574678</crs:AccountNumber>
+        <crs:AccountHolder>
+          <crs:Organisation>
+            <crs:ResCountryCode>GB</crs:ResCountryCode>
+            <crs:ResCountryCode>GB</crs:ResCountryCode>
+            <crs:IN issuedBy="VG" INType="FirstTypeOrg">76-2347867654</crs:IN>
+            <crs:IN issuedBy="US" INType="SecondTypeOrg">12-2347867656</crs:IN>
+            <crs:Name nameType="OECD202">AccountReport_ORG_Name_1</crs:Name>
+            <crs:Name nameType="OECD202">AccountReport_ORG_Name_2</crs:Name>
+            <crs:Address legalAddressType="OECD302">
+              <cfc:CountryCode>NG</cfc:CountryCode>
+              <cfc:AddressFix>
+                <cfc:Street>Street_AccountReport_ORG_1</cfc:Street>
+                <cfc:BuildingIdentifier>BuildingIdentifier_AccountReport_ORG_1</cfc:BuildingIdentifier>
+                <cfc:SuiteIdentifier>SuiteIdentifier_AccountReport_ORG_1</cfc:SuiteIdentifier>
+                <cfc:FloorIdentifier>FloorIdentifier_AccountReport_ORG_1</cfc:FloorIdentifier>
+                <cfc:DistrictName>DistrictName_AccountReport_ORG_1</cfc:DistrictName>
+                <cfc:POB>POB_AccountReport_ORG_1</cfc:POB>
+                <cfc:PostCode>PostCode_AccountReport_ORG_1</cfc:PostCode>
+                <cfc:City>City_AccountReport_ORG_1</cfc:City>
+                <cfc:CountrySubentity>CountrySubentity_AccountReport_ORG_1</cfc:CountrySubentity>
+              </cfc:AddressFix>
+              <cfc:AddressFree>MyAddressFree_AccountReport_ORG_1</cfc:AddressFree>
+            </crs:Address>
+            <crs:Address legalAddressType="OECD302">
+              <cfc:CountryCode>NG</cfc:CountryCode>
+              <cfc:AddressFix>
+                <cfc:Street>Street_AccountReport_ORG_2</cfc:Street>
+                <cfc:BuildingIdentifier>BuildingIdentifier_AccountReport_ORG_2</cfc:BuildingIdentifier>
+                <cfc:SuiteIdentifier>SuiteIdentifier_AccountReport_ORG_2</cfc:SuiteIdentifier>
+                <cfc:FloorIdentifier>FloorIdentifier_AccountReport_ORG_2</cfc:FloorIdentifier>
+                <cfc:DistrictName>DistrictName_AccountReport_ORG_2</cfc:DistrictName>
+                <cfc:POB>POB_AccountReport_ORG_2</cfc:POB>
+                <cfc:PostCode>PostCode_AccountReport_ORG_2</cfc:PostCode>
+                <cfc:City>City_AccountReport_ORG_1</cfc:City>
+                <cfc:CountrySubentity>CountrySubentity_AccountReport_ORG_2</cfc:CountrySubentity>
+              </cfc:AddressFix>
+              <cfc:AddressFree>MyAddressFree_AccountReport_ORG_2</cfc:AddressFree>
+            </crs:Address>
+          </crs:Organisation>
+          <crs:AcctHolderType>CRS102</crs:AcctHolderType>
+        </crs:AccountHolder>
+        <crs:AccountBalance currCode="USD">150000000.00</crs:AccountBalance>
+        <crs:Payment>
+          <crs:Type>CRS502</crs:Type>
+          <crs:PaymentAmnt currCode="USD">120010.00</crs:PaymentAmnt>
+        </crs:Payment>
+        <crs:Payment>
+          <crs:Type>CRS501</crs:Type>
+          <crs:PaymentAmnt currCode="USD">120010.00</crs:PaymentAmnt>
+        </crs:Payment>
+      </crs:AccountReport>
+    </crs:ReportingGroup>
+  </crs:CrsBody>
+</crs:CRS_OECD>

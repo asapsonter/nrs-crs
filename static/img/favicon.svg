@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- NRS favicon: Foundation Grey wordmark on white with the Prosperity Red
+       baseline chip, per the Brand Essentials sheet. -->
+  <rect width="64" height="64" rx="12" fill="#FFFFFF"/>
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="11.25" fill="none" stroke="#7D858B" stroke-width="1.5"/>
+  <text x="31" y="38" font-family="Poppins, Tahoma, Verdana, sans-serif" font-size="22" font-weight="700" font-style="italic" fill="#7D858B" text-anchor="middle" letter-spacing="0.5">NRS</text>
+  <rect x="12" y="45" width="30" height="4.5" fill="#7D858B"/>
+  <path d="M46 45h8.5l-2.4 4.5H43.6z" fill="#D42E12"/>
+</svg>

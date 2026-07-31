@@ -14,6 +14,8 @@ from decimal import Decimal, InvalidOperation
 
 from django.utils.dateparse import parse_date
 
+from portal.models import AccountReport
+
 # Template columns. Keys are normalised (lower, no spaces/underscores).
 REQUIRED_COLUMNS = [
     "HolderName",
@@ -25,19 +27,39 @@ REQUIRED_COLUMNS = [
 OPTIONAL_COLUMNS = [
     "HolderType",
     "AcctHolderType",
+    # NamePerson_Type components. Supplying these lets the record be reported
+    # with a real FirstName/LastName pair instead of the NFN fallback.
+    "FirstName",
+    "LastName",
     "TIN",
     "TINMissingReason",
     "AddressCountry",
+    # AddressFix components — City is what promotes a record from AddressFree.
+    "Street",
+    "BuildingIdentifier",
+    "PostCode",
+    "City",
+    "CountrySubentity",
     "BirthDate",
+    "BirthCity",
+    "BirthCitySubentity",
+    "BirthCountry",
+    "BirthFormerCountryName",
     "SelfCertification",
+    "AcctNumberType",
+    "ClosedAccount",
+    "DormantAccount",
     "Balance",
     "Dividends",
     "Interest",
     "GrossProceeds",
     "OtherIncome",
     "CPName",
+    "CPFirstName",
+    "CPLastName",
     "CPResidence",
     "CPTIN",
+    "CPCity",
     "CPType",
 ]
 ALL_COLUMNS = REQUIRED_COLUMNS + OPTIONAL_COLUMNS
@@ -45,6 +67,9 @@ ALL_COLUMNS = REQUIRED_COLUMNS + OPTIONAL_COLUMNS
 _HOLDER_TYPES = {"INDIVIDUAL", "ORGANISATION"}
 _ACCT_HOLDER_TYPES = {"CRS101", "CRS102", "CRS103"}
 _SELF_CERTS = {"OBTAINED", "CURED", "NOT_OBTAINED"}
+_ACCT_NUMBER_TYPES = set(AccountReport.AcctNumberType.values)
+_TRUE_VALUES = {"TRUE", "YES", "Y", "1"}
+_FALSE_VALUES = {"", "FALSE", "NO", "N", "0"}
 
 
 def _norm(name: str) -> str:
@@ -54,6 +79,8 @@ def _norm(name: str) -> str:
 @dataclass
 class ParsedExcelRecord:
     holder_name: str = ""
+    holder_first_name: str = ""
+    holder_last_name: str = ""
     holder_type: str = "INDIVIDUAL"
     acct_holder_type: str = ""
     residence_country: str = ""
@@ -61,9 +88,21 @@ class ParsedExcelRecord:
     tin_unavailable_reason: str = ""
     holder_address: str = ""
     address_country: str = ""
+    holder_street: str = ""
+    holder_building_identifier: str = ""
+    holder_post_code: str = ""
+    holder_city: str = ""
+    holder_country_subentity: str = ""
     birth_date: object = None
+    birth_city: str = ""
+    birth_city_subentity: str = ""
+    birth_country_code: str = ""
+    birth_former_country_name: str = ""
     self_certification: str = ""
     account_number: str = ""
+    acct_number_type: str = ""
+    closed_account: bool = False
+    dormant_account: bool = False
     currency: str = ""
     balance: Decimal = Decimal("0")
     dividends: Decimal = Decimal("0")
@@ -71,8 +110,11 @@ class ParsedExcelRecord:
     gross_proceeds: Decimal = Decimal("0")
     other_income: Decimal = Decimal("0")
     cp_name: str = ""
+    cp_first_name: str = ""
+    cp_last_name: str = ""
     cp_residence: str = ""
     cp_tin: str = ""
+    cp_city: str = ""
     cp_type: str = ""
 
 
@@ -183,9 +225,17 @@ def parse_excel_upload(content: bytes, filename: str) -> ExcelParseResult:
         # blank for individuals (per the CRS portal convention).
         record.acct_holder_type = acct_holder_type if holder_type == "ORGANISATION" else ""
 
+        record.holder_first_name = cell(row, "FirstName")
+        record.holder_last_name = cell(row, "LastName")
         record.foreign_tin = cell(row, "TIN")
         record.tin_unavailable_reason = cell(row, "TINMissingReason")
         record.address_country = cell(row, "AddressCountry").upper() or record.residence_country
+
+        record.holder_street = cell(row, "Street")
+        record.holder_building_identifier = cell(row, "BuildingIdentifier")
+        record.holder_post_code = cell(row, "PostCode")
+        record.holder_city = cell(row, "City")
+        record.holder_country_subentity = cell(row, "CountrySubentity")
 
         raw_birth = cell(row, "BirthDate")
         if raw_birth:
@@ -194,12 +244,41 @@ def parse_excel_upload(content: bytes, filename: str) -> ExcelParseResult:
                 errors.append(f"Row {line}: BirthDate '{raw_birth}' is not a valid date (use YYYY-MM-DD).")
             else:
                 record.birth_date = parsed
+        record.birth_city = cell(row, "BirthCity")
+        record.birth_city_subentity = cell(row, "BirthCitySubentity")
+        record.birth_country_code = cell(row, "BirthCountry").upper()
+        record.birth_former_country_name = cell(row, "BirthFormerCountryName")
+        if record.birth_country_code and len(record.birth_country_code) != 2:
+            errors.append(f"Row {line}: BirthCountry must be a 2-letter ISO code.")
+            record.birth_country_code = ""
+        if record.birth_country_code and record.birth_former_country_name:
+            errors.append(
+                f"Row {line}: give either BirthCountry or BirthFormerCountryName, not both "
+                "— CRS CountryInfo is a choice between the two."
+            )
 
         self_cert = cell(row, "SelfCertification").upper()
         if self_cert and self_cert not in _SELF_CERTS:
             errors.append(f"Row {line}: SelfCertification must be OBTAINED, CURED or NOT_OBTAINED.")
             self_cert = ""
         record.self_certification = self_cert
+
+        acct_number_type = cell(row, "AcctNumberType").upper()
+        if acct_number_type and acct_number_type not in _ACCT_NUMBER_TYPES:
+            errors.append(
+                f"Row {line}: AcctNumberType must be one of "
+                + "; ".join(label for _, label in AccountReport.AcctNumberType.choices)
+                + "."
+            )
+            acct_number_type = ""
+        record.acct_number_type = acct_number_type
+
+        for column, attr in (("ClosedAccount", "closed_account"), ("DormantAccount", "dormant_account")):
+            raw_flag = cell(row, column).upper()
+            if raw_flag in _TRUE_VALUES:
+                setattr(record, attr, True)
+            elif raw_flag not in _FALSE_VALUES:
+                errors.append(f"Row {line}: {column} must be TRUE or FALSE.")
 
         decimal_attrs = {
             "Balance": "balance",
@@ -216,9 +295,22 @@ def parse_excel_upload(content: bytes, filename: str) -> ExcelParseResult:
                 errors.append(f"Row {line}: {column} value '{raw}' is not a valid amount.")
 
         record.cp_name = cell(row, "CPName")
+        record.cp_first_name = cell(row, "CPFirstName")
+        record.cp_last_name = cell(row, "CPLastName")
         record.cp_residence = cell(row, "CPResidence").upper()
         record.cp_tin = cell(row, "CPTIN")
+        record.cp_city = cell(row, "CPCity")
         record.cp_type = cell(row, "CPType").upper()
+        # A CP given only as first/last name still counts as present. A first
+        # name alone is an error rather than a silent drop: LastName is the
+        # mandatory half of the CRS NamePerson pair.
+        if not record.cp_name and record.cp_last_name:
+            record.cp_name = " ".join(part for part in (record.cp_first_name, record.cp_last_name) if part)
+        elif not record.cp_name and record.cp_first_name:
+            errors.append(
+                f"Row {line}: CPFirstName was given without CPLastName or CPName; "
+                "add the controlling person's last name (or full CPName)."
+            )
         if record.cp_name and not record.cp_residence:
             errors.append(f"Row {line}: CPResidence is required when a CPName is given.")
         if record.cp_name and record.acct_holder_type != "CRS101":

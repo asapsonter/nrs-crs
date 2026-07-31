@@ -24,6 +24,7 @@ from django.utils import timezone
 from django.utils.cache import patch_vary_headers
 from django.utils.http import http_date
 
+from core import workhours
 from core.models import IssuedCredential
 
 PORTAL_PREFIX = "/portal/"
@@ -117,9 +118,11 @@ BACKOFFICE_EXEMPT = (
 class CredentialSessionMiddleware:
     """Enforces the issued-credential access window on every backoffice request.
 
-    On expiry the user is logged out, the credential is marked CONSUMED, and
-    an access-ended page is shown. A revoked credential ends its session on
-    the next request.
+    Two clocks apply: the validity window (months, fixed at first use) and
+    the working day (08:00-18:00 local). Past the validity window the
+    credential is CONSUMED and the user logged out; past the working day the
+    session is merely unbound — the credential stays valid for the next
+    working day. A revoked credential ends its session on the next request.
     """
 
     def __init__(self, get_response):
@@ -157,12 +160,27 @@ class CredentialSessionMiddleware:
 
         if credential.status == IssuedCredential.Status.ACTIVE and credential.session_expires_at:
             if timezone.now() >= credential.session_expires_at:
-                credential.consume("Session window elapsed. Access ended by the platform.")
+                credential.consume("Validity window elapsed. Access ended by the platform.")
                 logout(request)
                 return render(
                     request,
                     "backoffice/access_ended.html",
-                    {"reason": "Your access window has ended. Contact the administrator for a new credential."},
+                    {"reason": "Your credential's validity window has ended. Contact the administrator for a new credential."},
+                    status=403,
+                )
+            if not credential.is_unlimited and not workhours.within_working_hours():
+                credential.unbind("Working day closed. Session ended; credential remains valid.")
+                logout(request)
+                return render(
+                    request,
+                    "backoffice/access_ended.html",
+                    {
+                        "reason": (
+                            "The working day has closed. Access runs "
+                            f"{workhours.working_hours_label()} (WAT); your credential remains "
+                            "valid — sign in again during working hours."
+                        )
+                    },
                     status=403,
                 )
         elif credential.status != IssuedCredential.Status.ACTIVE:

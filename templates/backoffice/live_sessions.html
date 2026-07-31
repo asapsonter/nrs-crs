@@ -2,10 +2,10 @@
 {% block title %}Live Sessions · NRS Supervision Centre{% endblock %}
 {% block content %}
 <h1>Live Sessions</h1>
-<p class="page-sub">Credentials currently bound to a session, with remaining time. Revocation ends the session on its next request.</p>
+<p class="page-sub">Credentials bound to a session right now. Officers sign in each working day (08:00&ndash;18:00 WAT) for as long as their credential's validity runs. Revocation ends a session on its next request.</p>
 
 <table class="data">
-  <thead><tr><th>Username</th><th>Officer</th><th>Role</th><th>First use</th><th>Session ends</th><th>Remaining</th><th></th></tr></thead>
+  <thead><tr><th>Username</th><th>Officer</th><th>Role</th><th>First use</th><th>Valid until</th><th></th></tr></thead>
   <tbody>
     {% for credential in active %}
     <tr>
@@ -13,8 +13,7 @@
       <td>{{ credential.officer.name }}</td>
       <td>{{ credential.role_display }}</td>
       <td>{{ credential.first_used_at|date:"Y-m-d H:i" }}</td>
-      <td>{{ credential.session_expires_at|date:"Y-m-d H:i" }}</td>
-      <td class="mono">{{ credential.remaining_seconds }} s</td>
+      <td>{{ credential.session_expires_at|date:"Y-m-d"|default:"Unlimited" }}</td>
       <td>
         <form method="post" action="/backoffice/admin-console/credentials/{{ credential.pk }}/revoke/" style="display:inline;">
           {% csrf_token %}
@@ -24,7 +23,32 @@
       </td>
     </tr>
     {% empty %}
-    <tr><td colspan="7" class="muted">No live sessions.</td></tr>
+    <tr><td colspan="6" class="muted">No live sessions.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Active credentials, signed out</h2>
+<table class="data">
+  <thead><tr><th>Username</th><th>Officer</th><th>Role</th><th>First use</th><th>Valid until</th><th></th></tr></thead>
+  <tbody>
+    {% for credential in signed_out %}
+    <tr>
+      <td class="mono">{{ credential.username }}</td>
+      <td>{{ credential.officer.name }}</td>
+      <td>{{ credential.role_display }}</td>
+      <td>{{ credential.first_used_at|date:"Y-m-d H:i" }}</td>
+      <td>{{ credential.session_expires_at|date:"Y-m-d"|default:"Unlimited" }}</td>
+      <td>
+        <form method="post" action="/backoffice/admin-console/credentials/{{ credential.pk }}/revoke/" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="/backoffice/admin-console/sessions/">
+          <button type="submit" class="btn ghost small">Revoke</button>
+        </form>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" class="muted">None. Every active credential is in session or none are active.</td></tr>
     {% endfor %}
   </tbody>
 </table>

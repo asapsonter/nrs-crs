@@ -5,7 +5,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from core import access, config
+from core import access, config, workhours
 from core.decorators import require_internal, superadmin_or_cap
 from core.models import AuditLog, IssuedCredential, OfficerProfile, Roles
 from portal.models import Filing, ReportingFI
@@ -21,8 +21,28 @@ def login_view(request):
         passcode = request.POST.get("passcode", "").strip()
         user = authenticate(request, username=username, password=passcode)
         if user is not None:
-            login(request, user)
             credential: IssuedCredential | None = getattr(request, "_pending_credential", None)
+            # Officer sign-in runs during working hours only. The Super Admin
+            # (who administers access) and unlimited-validity credentials are
+            # not confined to the working day.
+            if (
+                credential is not None
+                and not credential.is_unlimited
+                and not workhours.within_working_hours()
+            ):
+                return render(
+                    request,
+                    "backoffice/login.html",
+                    {
+                        "error": (
+                            "Officer sign in is available during working hours only, "
+                            f"{workhours.working_hours_label()} (WAT). "
+                            "Your credential remains valid; sign in again from "
+                            f"{config.WORK_DAY_START_HOUR:02d}:00."
+                        )
+                    },
+                )
+            login(request, user)
             if credential is not None:
                 # login() flushes any prior sign-in (for example the Super
                 # Admin who issued this credential), which leaves the session
@@ -30,18 +50,38 @@ def login_view(request):
                 if not request.session.session_key:
                     request.session.save()
                 request.session["credential_id"] = credential.pk
+                first_use = credential.first_used_at is None
                 credential.activate(request.session.session_key, user)
-                AuditLog.record(
-                    actor_name=credential.officer.name,
-                    actor_role=credential.role_display,
-                    action="CREDENTIAL_FIRST_USE",
-                    target=credential.username,
-                    detail=(
-                        f"Credential activated. Session window fixed at {credential.session_hours} hours, "
-                        f"ends {timezone.localtime(credential.session_expires_at):%Y-%m-%d %H:%M}."
-                    ),
-                    credential=credential,
-                )
+                if first_use:
+                    if credential.is_unlimited:
+                        detail = (
+                            "Credential activated with unlimited validity: no expiry "
+                            "and no working-hours confinement."
+                        )
+                    else:
+                        detail = (
+                            f"Credential activated. Validity fixed at {credential.session_months} "
+                            f"month{'s' if credential.session_months != 1 else ''}, ends "
+                            f"{timezone.localtime(credential.session_expires_at):%Y-%m-%d}. "
+                            f"Daily access {workhours.working_hours_label()}."
+                        )
+                    AuditLog.record(
+                        actor_name=credential.officer.name,
+                        actor_role=credential.role_display,
+                        action="CREDENTIAL_FIRST_USE",
+                        target=credential.username,
+                        detail=detail,
+                        credential=credential,
+                    )
+                else:
+                    AuditLog.record(
+                        actor_name=credential.officer.name,
+                        actor_role=credential.role_display,
+                        action="SESSION_STARTED",
+                        target=credential.username,
+                        detail="Officer signed in within the credential validity window.",
+                        credential=credential,
+                    )
                 return redirect("/backoffice/")
             if user.is_superuser:
                 AuditLog.record(
@@ -59,9 +99,9 @@ def login_view(request):
         if credential is not None:
             credential.lapse_if_unused()
             if credential.status == IssuedCredential.Status.CONSUMED:
-                error = "This credential has been consumed. Each credential admits exactly one session. Contact the administrator for a new credential."
-            elif credential.status == IssuedCredential.Status.ACTIVE:
-                error = "This credential is bound to a live session and cannot be used again. The attempt has been recorded."
+                error = "This credential has been consumed: its validity window has ended. Contact the administrator for a new credential."
+            elif credential.status == IssuedCredential.Status.ACTIVE and credential.bound_session_key:
+                error = "This credential is bound to a live session and cannot be used again until that session ends. The attempt has been recorded."
             elif credential.status == IssuedCredential.Status.REVOKED:
                 error = "This credential has been revoked by the administrator."
             elif credential.status == IssuedCredential.Status.EXPIRED:
@@ -74,14 +114,18 @@ def login_view(request):
 
 
 def logout_view(request):
-    """Voluntary sign out consumes the credential: the session is over."""
+    """Voluntary sign out ends the day's session; the credential stays valid.
+
+    The officer signs back in with the same credential on the next working
+    day (or later the same day) until the validity window ends.
+    """
     credential_id = request.session.get("credential_id")
     if credential_id:
         credential = IssuedCredential.objects.filter(
             pk=credential_id, status=IssuedCredential.Status.ACTIVE
         ).first()
         if credential:
-            credential.consume("Officer signed out. Session ended.")
+            credential.unbind("Officer signed out. Session ended; credential remains valid.")
     logout(request)
     return redirect("/backoffice/login/")
 

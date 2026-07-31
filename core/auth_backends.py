@@ -1,14 +1,16 @@
 """Authentication backend for Super Admin issued credentials.
 
-Backoffice officers hold no standing passwords. Each login presents a
-single-use credential; the backend admits it only while the credential is in
-the ISSUED state. Reuse of an ACTIVE credential from a second session is
-refused and flagged as a possible credential-sharing event.
+Backoffice officers hold no standing passwords. Each login presents an
+issued credential; the backend admits it while the credential is ISSUED, or
+ACTIVE within its validity window with no live session bound (the daily
+re-login). A login against an ACTIVE credential that is already bound to a
+live session is refused and flagged as a possible credential-sharing event.
 """
 from __future__ import annotations
 
 from django.contrib.auth.backends import BaseBackend
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 from core.models import AuditLog, IssuedCredential
 
@@ -49,21 +51,26 @@ class IssuedCredentialBackend(BaseBackend):
         credential.lapse_if_unused()
 
         if credential.status == IssuedCredential.Status.ACTIVE:
-            # A second login with a live credential indicates the passcode has
-            # been shared. Refuse and flag for the auditor.
-            if credential.check_passcode(password):
-                AuditLog.record(
-                    actor_name=credential.officer.name,
-                    actor_role=credential.role_display,
-                    action="CREDENTIAL_REUSE_REFUSED",
-                    target=credential.username,
-                    detail="Login refused: credential already bound to a live session. Possible credential sharing.",
-                    credential=credential,
-                    flagged=True,
-                )
-            return None
-
-        if credential.status != IssuedCredential.Status.ISSUED:
+            if credential.bound_session_key:
+                # A second login with a live credential indicates the passcode
+                # has been shared. Refuse and flag for the auditor.
+                if credential.check_passcode(password):
+                    AuditLog.record(
+                        actor_name=credential.officer.name,
+                        actor_role=credential.role_display,
+                        action="CREDENTIAL_REUSE_REFUSED",
+                        target=credential.username,
+                        detail="Login refused: credential already bound to a live session. Possible credential sharing.",
+                        credential=credential,
+                        flagged=True,
+                    )
+                return None
+            # Daily re-login within the validity window: the previous session
+            # was ended (sign out or close of the working day).
+            if credential.session_expires_at and timezone.now() >= credential.session_expires_at:
+                credential.consume("Validity window elapsed at sign-in.")
+                return None
+        elif credential.status != IssuedCredential.Status.ISSUED:
             return None
         if not credential.check_passcode(password):
             return None

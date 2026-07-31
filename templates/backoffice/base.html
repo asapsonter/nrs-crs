@@ -4,18 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}NRS Supervision Centre{% endblock %}</title>
+<link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
 <link rel="stylesheet" href="{% static 'css/backoffice.css' %}">
 </head>
 <body>
 <div class="bo-layout">
   <aside class="bo-sidebar">
     <div class="brand">
-      <a href="/" title="Return to the home page">
-        <span class="mono-badge">NRS</span>
-        <span class="brand-text">
-          <span class="org">Nigeria Revenue Service</span>
-          <span class="sys">AEOI-CRS Supervision Centre</span>
-        </span>
+      <a href="/" title="Return to the home page" class="brand-lockup">
+        {% include "_nrs_logo.html" with logo_class="sm on-dark" %}
+        <span class="sys">AEOI-CRS Supervision Centre</span>
       </a>
     </div>
     <nav>
@@ -85,7 +83,10 @@
                 {% for label in credential.role_labels %}<span class="role-chip">{{ label }}</span>{% endfor %}
               </span>
             </span>
-            <span class="countdown" id="session-countdown" data-remaining="{{ credential_remaining_seconds }}">--:--</span>
+            {% if credential_remaining_seconds is not None %}
+            <span class="countdown" id="session-countdown" data-remaining="{{ credential_remaining_seconds }}"
+                  title="Time to the 18:00 close of the working day. Credential valid until {{ credential_valid_until|date:'j M Y' }}.">--:--</span>
+            {% endif %}
           {% elif user.is_superuser %}
             <span class="user-badge"><span class="user-name">Super Admin</span></span>
           {% endif %}

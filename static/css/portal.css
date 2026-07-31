@@ -4,13 +4,44 @@
    split (white and light neutrals dominant, charcoal secondary, red reserved
    for interactive elements and alerts), ease-in-out micro-interactions.
    Component definitions (buttons, pills, tables, forms) are identical to the
-   backoffice stylesheet; only the chrome differs. */
+   backoffice stylesheet; only the chrome differs.
+
+   Colours and type follow the NRS Brand Essentials sheet: Prosperity Red
+   (Pantone 485C #D42E12), Foundation Grey (Pantone 430C #7D858B), white,
+   and the Poppins/Tahoma approved typefaces. */
+
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/poppins-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/poppins-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/poppins-700.woff2") format("woff2");
+}
 
 :root {
-  --red: #C00000;
-  --red-dark: #8A0000;
-  /* National grace note: the Nigerian flag green, used for focus, positive
-     states, and flag accents. A secondary accent, never a flood. */
+  /* Prosperity Red: the brand accent for interactive elements and alerts. */
+  --red: #D42E12;
+  --red-dark: #A82410;
+  /* Foundation Grey: the brand neutral for identity marks and structure. */
+  --foundation: #7D858B;
+  --foundation-dark: #626A70;
+  --foundation-tint: #EEF0F1;
+  /* The Nigerian flag green survives only where it is semantic: the flag
+     ribbon itself and success states. Chrome accents are grey and red. */
   --green: #008751;
   --green-dark: #016B41;
   --green-tint: #E7F3EC;
@@ -21,7 +52,7 @@
   --border: #E5E7EB;
   --band: #F4F4F5;
   --band-light: #FAFAFA;
-  --error-tint: #FDECEC;
+  --error-tint: #FBEAE6;
   --s1: 8px;
   --s2: 16px;
   --s3: 24px;
@@ -61,7 +92,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: "Poppins", Tahoma, Verdana, "Segoe UI", system-ui, sans-serif;
   color: var(--charcoal);
   background: #FFFFFF;
   font-size: var(--fs-body);
@@ -234,9 +265,9 @@ a:hover { color: var(--red-dark); }
 .pt-side-brand .mark {
   flex: none; width: 44px; height: 44px; border-radius: 11px;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #E01A1A, var(--red)); color: #FFFFFF;
+  background: linear-gradient(135deg, #8B939A 0%, var(--foundation) 45%, var(--foundation-dark) 100%); color: #FFFFFF;
   font-weight: 700; font-size: 14px; letter-spacing: 0.5px;
-  box-shadow: 0 4px 12px rgba(192, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 .pt-side-brand .pt-side-brand-text { display: flex; flex-direction: column; }
 .pt-side-brand .org { font-size: 15px; font-weight: 700; color: #FFFFFF; letter-spacing: 0.2px; }
@@ -345,7 +376,7 @@ a:hover { color: var(--red-dark); }
   border-radius: 999px;
   border: 1px solid transparent;
 }
-.pt-role-badge.checker { background: var(--error-tint); color: var(--red-dark); border-color: #F3C1C1; }
+.pt-role-badge.checker { background: var(--error-tint); color: var(--red-dark); border-color: #F2C4B8; }
 .pt-role-badge.maker { background: #EAF1FB; color: #1E5FA8; border-color: #C6DAF2; }
 .pt-avatar {
   flex: none; width: 40px; height: 40px; border-radius: 50%;
@@ -458,7 +489,7 @@ h2 { font-size: var(--fs-h2); font-weight: 600; margin: var(--s4) 0 var(--s2); }
 .deadline-banner strong { font-variant-numeric: tabular-nums; }
 .deadline-banner.overdue {
   background: var(--error-tint);
-  border-color: #F3C1C1;
+  border-color: #F2C4B8;
   color: var(--red-dark);
   font-weight: 600;
 }
@@ -717,11 +748,11 @@ table.data td.muted { color: var(--gray-muted); }
 .vf-status.validated { background: #E7F3EC; color: #016B41; border-color: #B9E0C8; }
 .vf-status.draft { background: #FDF3E3; color: #96610C; border-color: #EFD3A0; }
 .vf-status.nodata { background: #F4F4F5; color: #52525B; border-color: #E4E4E7; }
-.vf-status.mandatory { background: #FDECEC; color: #8A0000; border-color: #F3C1C1; }
+.vf-status.mandatory { background: #FBEAE6; color: #A82410; border-color: #F2C4B8; }
 .vf-status.big { font-size: 12.5px; padding: 4px 12px; }
 .vf-badge-mand {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-  color: #B23A3A; border: 1px solid #F3C1C1; border-radius: 4px; padding: 1px 6px; background: #FDECEC;
+  color: #B0492F; border: 1px solid #F2C4B8; border-radius: 4px; padding: 1px 6px; background: #FBEAE6;
 }
 
 /* Filing header */
@@ -768,7 +799,7 @@ table.data td.muted { color: var(--gray-muted); }
   padding: 2px 7px; border-radius: 5px; flex: none;
 }
 .vf-code.gi { background: #EAF1FB; color: #1E5FA8; }
-.vf-code.crs { background: #FDECEC; color: #8A0000; }
+.vf-code.crs { background: #FBEAE6; color: #A82410; }
 .vf-code.rfi { background: #E7F3EC; color: #016B41; }
 .vf-code.ai { background: #ECEBFB; color: #4B3F9E; }
 .vf-code.cp { background: #FDF3E3; color: #96610C; }
@@ -832,7 +863,7 @@ label.is-dim { opacity: 0.45; }
 .vf-act:hover { border-color: #C9CDD3; background: var(--band-light); color: var(--charcoal); }
 .vf-act.add { color: #016B41; border-color: #B9E0C8; background: #F2FAF5; }
 .vf-act.add:hover { background: #E7F3EC; }
-.vf-act.danger { color: var(--red); border-color: #F3C1C1; background: #FEF6F6; }
+.vf-act.danger { color: var(--red); border-color: #F2C4B8; background: #FDF3F0; }
 .vf-act.danger:hover { background: var(--error-tint); color: var(--red-dark); }
 
 @media (max-width: 720px) {
@@ -895,7 +926,7 @@ label.is-dim { opacity: 0.45; }
   font-weight: 700;
   color: var(--red-dark);
   background: var(--error-tint);
-  border: 1px solid #F3C1C1;
+  border: 1px solid #F2C4B8;
   border-radius: 6px;
   padding: 1px 7px;
   white-space: nowrap;
@@ -983,7 +1014,7 @@ label.is-dim { opacity: 0.45; }
   font-size: 11px;
   line-height: 1;
 }
-.pill.rejected, .pill.error { background: #FDECEC; color: #8A0000; border-color: #F3C1C1; }
+.pill.rejected, .pill.error { background: #FBEAE6; color: #A82410; border-color: #F2C4B8; }
 .pill.correction { background: #FCEDE6; color: #B23A10; border-color: #EDB79E; }
 
 /* Forms: labels sit close to their inputs; groups separated by grid steps. */
@@ -1031,16 +1062,16 @@ form.stacked input:hover, form.stacked select:hover, form.stacked textarea:hover
   background: #FFFFFF;
   transform: translateY(-1px);
 }
-/* Focus transforms with a green ring, the national accent: a clear, calm
-   signal distinct from the red reserved for alerts. */
+/* Focus transforms with a Foundation Grey ring: a clear, calm signal
+   distinct from the Prosperity Red reserved for actions and alerts. */
 form.stacked input:focus, form.stacked select:focus, form.stacked textarea:focus {
   outline: none;
-  border-color: var(--green);
+  border-color: var(--foundation-dark);
   background: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(0, 135, 81, 0.16);
+  box-shadow: 0 0 0 3px rgba(125, 133, 139, 0.24);
   transform: translateY(-1px);
 }
-form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-color: var(--green); width: auto; }
+form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-color: var(--red); width: auto; }
 
 /* Buttons: primary visibly larger than secondary actions. */
 .btn {
@@ -1115,7 +1146,7 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: none; }
 }
-.flash.error { background: var(--error-tint); color: var(--red-dark); border-color: #F3C1C1; }
+.flash.error { background: var(--error-tint); color: var(--red-dark); border-color: #F2C4B8; }
 .flash.success {
   background: var(--green-tint);
   color: var(--green-dark);
@@ -1233,7 +1264,7 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
   position: absolute;
   top: -180px; right: -140px;
   width: 480px; height: 480px;
-  background: radial-gradient(circle, rgba(192,0,0,0.34), transparent 70%);
+  background: radial-gradient(circle, rgba(212,46,18,0.34), transparent 70%);
   pointer-events: none;
 }
 .landing-hero-inner { max-width: 1040px; margin: 0 auto; position: relative; }
@@ -1246,7 +1277,7 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
   border: 1px solid rgba(255,255,255,0.16);
 }
 .landing-hero .crest-badge .mark {
-  background: linear-gradient(135deg, #D81717, var(--red)); color: #FFFFFF; font-weight: 700; font-size: 13px;
+  background: linear-gradient(135deg, #8B939A 0%, var(--foundation) 45%, var(--foundation-dark) 100%); color: #FFFFFF; font-weight: 700; font-size: 13px;
   padding: 4px 9px; border-radius: 999px;
 }
 .landing-hero h1 {
@@ -1300,7 +1331,7 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
   display: flex; align-items: center; justify-content: center;
   color: #FFFFFF; margin-bottom: 18px;
 }
-.entry-card.portal .icon { background: linear-gradient(135deg, #D81717, var(--red)); box-shadow: 0 4px 12px rgba(192,0,0,0.28); }
+.entry-card.portal .icon { background: linear-gradient(135deg, #E44E2E, var(--red)); box-shadow: 0 4px 12px rgba(212,46,18,0.28); }
 .entry-card.office .icon { background: linear-gradient(135deg, #4A4A52, var(--charcoal)); box-shadow: 0 4px 12px rgba(43,43,43,0.28); }
 .entry-card .icon svg { width: 22px; height: 22px; }
 .entry-card .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gray-muted); }
@@ -1380,7 +1411,7 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
   width: 22px; height: 22px;
   border-radius: 50%;
   background: var(--error-tint);
-  border: 1px solid rgba(192, 0, 0, 0.35);
+  border: 1px solid rgba(212, 46, 18, 0.35);
   color: var(--red-dark);
   display: flex; align-items: center; justify-content: center;
   font-size: 12px;
@@ -1496,7 +1527,7 @@ form.stacked .phone-group input { flex: 1 1 auto; width: auto; max-width: none; 
 .enrol-type-card:has(input:checked) {
   border-color: var(--red);
   background: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(192, 0, 0, 0.15);
+  box-shadow: 0 0 0 3px rgba(212, 46, 18, 0.15);
   transform: none;
 }
 .enrol-type-card:has(input:checked) .etc-icon { background: var(--error-tint); color: var(--red); }
@@ -1565,11 +1596,11 @@ form.stacked .phone-group input { flex: 1 1 auto; width: auto; max-width: none; 
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #D81717, var(--red));
+  background: linear-gradient(135deg, #E44E2E, var(--red));
   color: #FFFFFF;
   font-size: 14px;
   font-weight: 700;
-  box-shadow: 0 2px 6px rgba(192, 0, 0, 0.28);
+  box-shadow: 0 2px 6px rgba(212, 46, 18, 0.28);
 }
 .fset-title { font-size: 17px; font-weight: 700; color: var(--charcoal); margin: 2px 0 0; }
 .fset-hint { font-size: 13px; color: var(--gray-muted); margin: 3px 0 0; line-height: 1.5; }
@@ -1580,6 +1611,10 @@ form.stacked .phone-group input { flex: 1 1 auto; width: auto; max-width: none; 
 
 /* Person name entry: surname, middle name, other names on one line. */
 .name-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s1) var(--s2); }
+/* Inline checkbox pair (closed / dormant account flags). */
+.check-row { display: flex; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s2); }
+.check-row label { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: normal; }
+.check-row input[type="checkbox"] { width: auto; margin: 0; }
 .name-grid .field { display: flex; flex-direction: column; margin-top: var(--s2); }
 .name-grid .field label { margin: 0 0 5px; }
 form.stacked .name-grid input { width: 100%; max-width: none; }
@@ -1617,10 +1652,10 @@ form.stacked .field .phone-group input { width: auto; }
   gap: 10px;
   font-size: var(--fs-body);
   font-weight: 600;
-  color: var(--green-dark);
-  background: var(--green-tint);
-  border: 1px solid var(--green);
-  border-left: 4px solid var(--green);
+  color: var(--charcoal);
+  background: var(--foundation-tint);
+  border: 1px solid var(--foundation);
+  border-left: 4px solid var(--red);
   border-radius: 4px;
   padding: 12px var(--s2);
   margin: 0;
@@ -1633,7 +1668,7 @@ form.stacked .field .phone-group input { width: auto; }
   height: 20px;
   margin-top: 1px;
   border-radius: 50%;
-  background: var(--green);
+  background: var(--red);
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -1697,4 +1732,80 @@ table.data tbody tr:nth-child(n+7) { animation-delay: 150ms; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* Official NRS lockup (Brand Essentials): the grey NRS wordmark over a
+   baseline rule finished with a Prosperity Red chip, a hairline divider,
+   and the service name stacked in red. */
+.nrs-logo { display: inline-flex; align-items: center; }
+.nrs-logo .nrs-logo-mark {
+  position: relative;
+  font-family: "Poppins", Tahoma, sans-serif;
+  font-weight: 700;
+  font-style: italic;
+  font-size: 27px;
+  line-height: 1;
+  letter-spacing: 0.5px;
+  color: var(--foundation);
+  padding: 0 12px 8px 0;
+  border-right: 1.5px solid var(--foundation);
+  margin-right: 10px;
+}
+.nrs-logo .nrs-logo-rule {
+  position: absolute;
+  left: 0;
+  right: 26px;
+  bottom: 0;
+  height: 3px;
+  background: var(--foundation);
+}
+.nrs-logo .nrs-logo-rule::after {
+  content: "";
+  position: absolute;
+  right: -14px;
+  bottom: 0;
+  width: 10px;
+  height: 3px;
+  background: var(--red);
+  transform: skewX(-24deg);
+}
+.nrs-logo .nrs-logo-name {
+  font-family: "Poppins", Tahoma, sans-serif;
+  font-weight: 700;
+  font-size: 10.5px;
+  line-height: 1.3;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--red);
+}
+.nrs-logo.sm .nrs-logo-mark { font-size: 20px; padding: 0 9px 6px 0; margin-right: 8px; }
+.nrs-logo.sm .nrs-logo-rule { right: 20px; height: 2.5px; }
+.nrs-logo.sm .nrs-logo-rule::after { right: -11px; width: 8px; height: 2.5px; }
+.nrs-logo.sm .nrs-logo-name { font-size: 8.5px; letter-spacing: 0.6px; }
+/* On charcoal surfaces the grey lifts and the red warms for contrast. */
+.nrs-logo.on-dark .nrs-logo-mark { color: #C2C8CD; border-right-color: rgba(255, 255, 255, 0.4); }
+.nrs-logo.on-dark .nrs-logo-rule { background: #C2C8CD; }
+.nrs-logo.on-dark .nrs-logo-name { color: #FF6B4F; }
+
+/* Lockup placements: public portal header and the landing hero. */
+.pt-header .brand a.brand-lockup { display: flex; align-items: center; gap: 14px; }
+.pt-header .brand .brand-lockup-text { display: flex; flex-direction: column; gap: 1px; }
+.landing-brand { display: flex; align-items: center; gap: 14px; }
+.landing-brand-role {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  padding-left: 14px;
+}
+/* Brand tagline, set quietly beneath the hero lead. */
+.landing-tagline {
+  margin-top: 16px;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 15px;
+  color: #FF8A73;
 }

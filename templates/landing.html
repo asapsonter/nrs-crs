@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NRS AEOI-CRS Platform</title>
+<link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
 <link rel="stylesheet" href="{% static 'css/portal.css' %}">
 </head>
 <body>
@@ -11,9 +12,13 @@
   <div class="flag-ribbon landing-flag"></div>
   <header class="landing-hero">
     <div class="landing-hero-inner">
-      <span class="crest-badge"><span class="mark">NRS</span> Nigeria Revenue Service &middot; Competent Authority</span>
+      <div class="landing-brand">
+        {% include "_nrs_logo.html" with logo_class="on-dark" %}
+        <span class="landing-brand-role">Competent Authority</span>
+      </div>
       <h1>Automatic Exchange of <span class="accent">Information</span></h1>
       <p class="lead">The national platform for the Common Reporting Standard: enrolment, filing, validation, and exchange of financial account information with partner jurisdictions.</p>
+      <p class="landing-tagline">Together we rise, together we prosper.</p>
     </div>
   </header>
 

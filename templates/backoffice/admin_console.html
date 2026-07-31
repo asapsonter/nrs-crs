@@ -2,10 +2,10 @@
 {% block title %}Admin Console · NRS Supervision Centre{% endblock %}
 {% block content %}
 <h1>Admin Console</h1>
-<p class="page-sub">Create internal users, assign them roles, and issue single-use, time-boxed credentials. Administrators administer; they do not process casework.</p>
+<p class="page-sub">Create internal users, assign them roles, and issue time-boxed credentials valid for whole months, usable during working hours (08:00&ndash;18:00 WAT). Administrators administer; they do not process casework.</p>
 
 {% if issued %}
-<div class="panel" style="border-color: #C00000;">
+<div class="panel" style="border-color: var(--red);">
   <h2 style="margin-top: 0;">Credential issued. Shown once only.</h2>
   <dl class="kv">
     <dt>User</dt><dd>{{ issued.0.officer.name }}</dd>
@@ -13,7 +13,7 @@
     <dt>Sign-in email</dt><dd class="mono">{{ issued.0.officer.email }}</dd>
     <dt>Credential reference</dt><dd class="mono">{{ issued.0.username }}</dd>
     <dt>Passcode</dt><dd class="mono"><strong>{{ issued.1 }}</strong></dd>
-    <dt>Session window</dt><dd>{{ issued.0.session_hours }} hours from first use</dd>
+    <dt>Validity</dt><dd>{% if issued.0.is_unlimited %}Unlimited &middot; no expiry, no working-hours limit{% else %}{{ issued.0.validity_display }} from first use &middot; daily access 08:00&ndash;18:00{% endif %}</dd>
     <dt>Valid for first use until</dt><dd>{{ issued.0.expires_if_unused_at|date:"Y-m-d H:i" }}</dd>
   </dl>
   <p class="muted">The passcode is stored hashed and cannot be retrieved again. If lost, revoke and issue a new credential.</p>
@@ -33,8 +33,17 @@
       <option value="" disabled>No users yet. Create one under Users.</option>
       {% endfor %}
     </select>
-    <label for="session_hours">Session duration (hours)</label>
-    <input type="number" name="session_hours" id="session_hours" step="0.05" min="0.05" max="24" value="5.0" required>
+    <label for="session_months">Validity (months)</label>
+    <select name="session_months" id="session_months" required>
+      <option value="1">1 month</option>
+      <option value="2">2 months</option>
+      <option value="3" selected>3 months</option>
+      <option value="6">6 months</option>
+      <option value="9">9 months</option>
+      <option value="12">12 months</option>
+      <option value="0">Unlimited &mdash; no time or working-hours limit</option>
+    </select>
+    <p class="muted">Officers sign in with the credential each working day; access runs 08:00&ndash;18:00 (WAT) until the validity window ends.</p>
     <div class="actions-row">
       <button type="submit" class="btn">Issue credential</button>
       <a class="btn secondary" href="/backoffice/admin-console/officers/">Manage users</a>
@@ -45,7 +54,7 @@
 <h2>Recent credentials</h2>
 <table class="data">
   <thead>
-    <tr><th>Username</th><th>User</th><th>Roles</th><th>Issued</th><th>Window</th><th>Status</th><th>Session ends</th><th></th></tr>
+    <tr><th>Username</th><th>User</th><th>Roles</th><th>Issued</th><th>Validity</th><th>Status</th><th>Valid until</th><th></th></tr>
   </thead>
   <tbody>
     {% for credential in recent %}
@@ -54,7 +63,7 @@
       <td>{{ credential.officer.name }}</td>
       <td>{{ credential.role_display }}</td>
       <td>{{ credential.issued_at|date:"Y-m-d H:i" }}</td>
-      <td>{{ credential.session_hours }} h</td>
+      <td>{% if credential.is_unlimited %}Unlimited{% else %}{{ credential.session_months }} mo{% endif %}</td>
       <td>
         {% if credential.status == 'ISSUED' %}<span class="pill review">Issued</span>
         {% elif credential.status == 'ACTIVE' %}<span class="pill active-state">Active</span>
@@ -62,7 +71,7 @@
         {% elif credential.status == 'REVOKED' %}<span class="pill rejected">Revoked</span>
         {% else %}<span class="pill draft">Expired</span>{% endif %}
       </td>
-      <td>{{ credential.session_expires_at|date:"Y-m-d H:i"|default:"-" }}</td>
+      <td>{{ credential.session_expires_at|date:"Y-m-d"|default:"-" }}</td>
       <td>
         {% if credential.status == 'ISSUED' or credential.status == 'ACTIVE' %}
         <form method="post" action="/backoffice/admin-console/credentials/{{ credential.pk }}/revoke/" style="display:inline;">

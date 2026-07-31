@@ -353,7 +353,8 @@ def filing_new_manual(request):
 
 @portal_required
 def filing_upload(request):
-    """CRS XML upload validated against the simplified schema (any portal user)."""
+    """CRS XML upload: the official CRS_OECD v2.0 document or the simplified
+    CRSFiling form, auto-detected (any portal user)."""
     profile = request.portal_profile
     errors: list[str] = []
     if request.method == "POST":
@@ -376,21 +377,66 @@ def filing_upload(request):
                     created_by=profile,
                     uploaded_filename=upload.name,
                 )
+                # A CRS_OECD document carries its message header; keep it on
+                # the filing so the preparer need not re-enter it.
+                header_fields = []
+                if result.message_type_indic in Filing.MessageType.values:
+                    filing.message_type = result.message_type_indic
+                    header_fields.append("message_type")
+                if result.receiving_country:
+                    filing.receiving_country = result.receiving_country
+                    header_fields.append("receiving_country")
+                if result.message_ref_id:
+                    filing.message_reference = result.message_ref_id
+                    header_fields.append("message_reference")
+                if header_fields:
+                    filing.save(update_fields=header_fields)
                 for parsed in result.records:
-                    AccountReport.objects.create(
+                    record = AccountReport.objects.create(
                         filing=filing,
                         doc_ref_id=next_doc_ref_id(profile.rfi, filing.reporting_year),
                         holder_name=parsed.holder_name,
+                        holder_first_name=parsed.holder_first_name,
+                        holder_last_name=parsed.holder_last_name,
                         holder_type=parsed.holder_type,
+                        acct_holder_type=parsed.acct_holder_type,
                         residence_country=parsed.residence_country,
                         foreign_tin=parsed.foreign_tin,
+                        holder_address=parsed.holder_address,
+                        address_country=parsed.address_country,
+                        holder_street=parsed.holder_street,
+                        holder_building_identifier=parsed.holder_building_identifier,
+                        holder_post_code=parsed.holder_post_code,
+                        holder_city=parsed.holder_city,
+                        holder_country_subentity=parsed.holder_country_subentity,
+                        birth_date=parsed.birth_date,
+                        birth_city=parsed.birth_city,
+                        birth_city_subentity=parsed.birth_city_subentity,
+                        birth_country_code=parsed.birth_country_code,
                         account_number=parsed.account_number,
+                        acct_number_type=parsed.acct_number_type,
+                        closed_account=parsed.closed_account,
+                        dormant_account=parsed.dormant_account,
+                        currency=parsed.currency or "NGN",
                         balance=parsed.balance,
                         dividends=parsed.dividends,
                         interest=parsed.interest,
                         gross_proceeds=parsed.gross_proceeds,
                         other_income=parsed.other_income,
                     )
+                    for cp in parsed.controlling_persons:
+                        ControllingPerson.objects.create(
+                            account_report=record,
+                            name=cp.name,
+                            first_name=cp.first_name,
+                            last_name=cp.last_name,
+                            residence_country=cp.residence_country,
+                            tin=cp.tin,
+                            address=cp.address,
+                            city=cp.city,
+                            birth_date=cp.birth_date,
+                            ctrlg_person_type=cp.ctrlg_person_type,
+                        )
                 _audit(
                     profile,
                     "FILING_UPLOADED",
@@ -442,6 +488,8 @@ def filing_upload_excel(request):
                         filing=filing,
                         doc_ref_id=next_doc_ref_id(profile.rfi, filing.reporting_year),
                         holder_name=parsed.holder_name,
+                        holder_first_name=parsed.holder_first_name,
+                        holder_last_name=parsed.holder_last_name,
                         holder_type=parsed.holder_type,
                         acct_holder_type=parsed.acct_holder_type,
                         residence_country=parsed.residence_country,
@@ -449,9 +497,21 @@ def filing_upload_excel(request):
                         tin_unavailable_reason=parsed.tin_unavailable_reason,
                         holder_address=parsed.holder_address,
                         address_country=parsed.address_country,
+                        holder_street=parsed.holder_street,
+                        holder_building_identifier=parsed.holder_building_identifier,
+                        holder_post_code=parsed.holder_post_code,
+                        holder_city=parsed.holder_city,
+                        holder_country_subentity=parsed.holder_country_subentity,
                         birth_date=parsed.birth_date,
+                        birth_city=parsed.birth_city,
+                        birth_city_subentity=parsed.birth_city_subentity,
+                        birth_country_code=parsed.birth_country_code,
+                        birth_former_country_name=parsed.birth_former_country_name,
                         self_certification=parsed.self_certification,
                         account_number=parsed.account_number,
+                        acct_number_type=parsed.acct_number_type,
+                        closed_account=parsed.closed_account,
+                        dormant_account=parsed.dormant_account,
                         currency=parsed.currency,
                         balance=parsed.balance,
                         dividends=parsed.dividends,
@@ -463,8 +523,11 @@ def filing_upload_excel(request):
                         ControllingPerson.objects.create(
                             account_report=record,
                             name=parsed.cp_name,
+                            first_name=parsed.cp_first_name,
+                            last_name=parsed.cp_last_name,
                             residence_country=parsed.cp_residence,
                             tin=parsed.cp_tin,
+                            city=parsed.cp_city,
                             ctrlg_person_type=parsed.cp_type or ControllingPerson.CtrlgPersonType.CRS801,
                         )
                 _audit(
@@ -547,6 +610,7 @@ def _record_form_context() -> dict:
     return {
         "currencies": config.CURRENCIES,
         "acct_holder_types": AccountReport.AcctHolderType.choices,
+        "acct_number_types": AccountReport.AcctNumberType.choices,
         "self_cert_choices": AccountReport.SelfCertification.choices,
         "ctrlg_person_types": ControllingPerson.CtrlgPersonType.choices,
     }
@@ -632,6 +696,9 @@ def _apply_record_form(request, filing: Filing, record: AccountReport | None, pr
     self_certification = request.POST.get("self_certification", "").strip()
     if self_certification not in dict(AccountReport.SelfCertification.choices):
         self_certification = ""
+    acct_number_type = request.POST.get("acct_number_type", "").strip().upper()
+    if acct_number_type not in dict(AccountReport.AcctNumberType.choices):
+        acct_number_type = ""
     amounts: dict[str, Decimal] = {}
     for field_name in ("balance", "dividends", "interest", "gross_proceeds", "other_income"):
         raw = request.POST.get(field_name, "0").strip() or "0"
@@ -641,6 +708,8 @@ def _apply_record_form(request, filing: Filing, record: AccountReport | None, pr
             return f"The {field_name.replace('_', ' ')} amount is not a valid number."
     values = {
         "holder_name": holder_name,
+        "holder_first_name": request.POST.get("holder_first_name", "").strip(),
+        "holder_last_name": request.POST.get("holder_last_name", "").strip(),
         "holder_type": holder_type,
         "acct_holder_type": acct_holder_type if holder_type == "ORGANISATION" else "",
         "residence_country": residence_country,
@@ -648,10 +717,19 @@ def _apply_record_form(request, filing: Filing, record: AccountReport | None, pr
         "tin_unavailable_reason": request.POST.get("tin_unavailable_reason", "").strip(),
         "holder_address": holder_address,
         "address_country": (request.POST.get("address_country", "").strip().upper() or residence_country),
+        "holder_street": request.POST.get("holder_street", "").strip(),
+        "holder_building_identifier": request.POST.get("holder_building_identifier", "").strip(),
+        "holder_post_code": request.POST.get("holder_post_code", "").strip(),
+        "holder_city": request.POST.get("holder_city", "").strip(),
+        "holder_country_subentity": request.POST.get("holder_country_subentity", "").strip(),
         "birth_date": parse_date(request.POST.get("birth_date", "").strip() or "") or None,
         "birth_city": request.POST.get("birth_city", "").strip(),
+        "birth_country_code": request.POST.get("birth_country_code", "").strip().upper(),
         "self_certification": self_certification,
         "account_number": account_number,
+        "acct_number_type": acct_number_type,
+        "closed_account": bool(request.POST.get("closed_account")),
+        "dormant_account": bool(request.POST.get("dormant_account")),
         "currency": currency,
         **amounts,
     }
@@ -664,15 +742,29 @@ def _apply_record_form(request, filing: Filing, record: AccountReport | None, pr
         return ""
     # Correction: the amended data becomes a new record carrying OECD2 and a
     # CorrDocRefID pointing at the original DocRefID. The original stays on
-    # the filing, superseded, so the lineage is visible.
+    # the filing, superseded, so the lineage is visible. The replacement
+    # starts from the original's full payload so fields the form does not
+    # expose (Excel-only columns such as birth city subentity) carry over
+    # rather than resetting to defaults, and controlling persons are copied
+    # so the corrected record reports the same persons as the one it replaces.
     if filing.status == Filing.Status.RETURNED:
+        carried = {
+            f.name: getattr(record, f.name)
+            for f in AccountReport._meta.fields
+            if f.name not in ("id", "filing", "doc_ref_id", "corr_doc_ref_id", "doc_type_indic", "superseded")
+        }
+        carried.update(values)
         replacement = AccountReport.objects.create(
             filing=filing,
             doc_ref_id=next_doc_ref_id(filing.rfi, filing.reporting_year),
             corr_doc_ref_id=record.doc_ref_id,
             doc_type_indic=AccountReport.DocTypeIndic.OECD2,
-            **values,
+            **carried,
         )
+        for cp in record.controlling_persons.all():
+            cp.pk = None
+            cp.account_report = replacement
+            cp.save()
         record.superseded = True
         record.save(update_fields=["superseded"])
         _audit(
@@ -690,15 +782,17 @@ def _apply_record_form(request, filing: Filing, record: AccountReport | None, pr
 
 @portal_required
 def record_edit(request, filing_id: int, record_id: int):
-    """Amend a record: freely while open, flagged records only when returned."""
+    """Amend a record: freely while open, as an OECD2 correction when returned.
+
+    On a returned filing every non-superseded record may be amended, not only
+    the flagged ones — the NRS may return a filing with file-level findings
+    or a narrative reason that touches records it did not individually flag.
+    Each amendment supersedes its original and carries a CorrDocRefID.
+    """
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
     record = get_object_or_404(AccountReport, pk=record_id, filing=filing, superseded=False)
-    if filing.status == Filing.Status.RETURNED:
-        if not filing.findings.filter(account_report=record).exists():
-            messages.error(request, "Only records flagged by the NRS may be amended on a returned filing.")
-            return redirect(f"/portal/filings/{filing.pk}/")
-    elif filing.status not in _OPEN_STATUSES:
+    if filing.status not in (*_OPEN_STATUSES, Filing.Status.RETURNED):
         messages.error(request, "This filing is not open for amendment.")
         return redirect(f"/portal/filings/{filing.pk}/")
     if request.method == "POST":
@@ -772,12 +866,18 @@ def controlling_person_add(request, filing_id: int, record_id: int):
     cp_type = request.POST.get("cp_type", "").strip()
     if cp_type not in dict(ControllingPerson.CtrlgPersonType.choices):
         cp_type = ControllingPerson.CtrlgPersonType.CRS801
+    # The structured name parts feed the CRS FirstName/LastName pair directly,
+    # so a form-entered controlling person is never reported under the NFN
+    # fallback when a surname was captured.
     ControllingPerson.objects.create(
         account_report=record,
         name=name,
+        first_name=" ".join(part for part in [other_names, middle_name] if part),
+        last_name=surname,
         residence_country=residence,
         tin=request.POST.get("cp_tin", "").strip(),
         address=request.POST.get("cp_address", "").strip(),
+        city=request.POST.get("cp_city", "").strip(),
         birth_date=parse_date(request.POST.get("cp_dob", "").strip() or "") or None,
         ctrlg_person_type=cp_type,
     )
@@ -866,12 +966,20 @@ def filing_resubmit(request, filing_id: int):
     if filing.status != Filing.Status.RETURNED:
         messages.error(request, "Only a filing returned for correction can be resubmitted.")
         return redirect(f"/portal/filings/{filing.pk}/")
+    # Every record the NRS flagged must carry a correction before the filing
+    # goes back. A filing returned on file-level findings alone (no flagged
+    # records) may be resubmitted once the preparer has made their fixes.
+    outstanding = (
+        filing.findings.filter(account_report__isnull=False, account_report__superseded=False)
+        .exclude(account_report__doc_type_indic=AccountReport.DocTypeIndic.OECD2)
+        .count()
+    )
+    if outstanding:
+        messages.error(request, "Amend the flagged records before resubmitting.")
+        return redirect(f"/portal/filings/{filing.pk}/")
     corrected = filing.account_reports.filter(
         doc_type_indic=AccountReport.DocTypeIndic.OECD2, superseded=False
     ).count()
-    if corrected == 0:
-        messages.error(request, "Amend the flagged records before resubmitting.")
-        return redirect(f"/portal/filings/{filing.pk}/")
     before = filing.status
     filing.status = Filing.Status.SUBMITTED
     filing.checker = profile
@@ -881,7 +989,8 @@ def filing_resubmit(request, filing_id: int):
         profile,
         "FILING_CORRECTION_SUBMITTED",
         filing,
-        f"Correction resubmitted to the NRS with {corrected} amended records carrying CorrDocRefID references.",
+        f"Correction resubmitted to the NRS with {corrected} amended record{'s' if corrected != 1 else ''} "
+        "carrying CorrDocRefID references.",
         before=before,
         after=filing.status,
     )

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Supervision Centre Sign In</title>
+<link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
 <link rel="stylesheet" href="{% static 'css/backoffice.css' %}">
 </head>
 <body>
@@ -11,8 +12,7 @@
   <aside class="auth-hero">
     <div>
       <div class="auth-crest">
-        <span class="mark">NRS</span>
-        <span class="mark-text">Nigeria Revenue Service</span>
+        {% include "_nrs_logo.html" with logo_class="on-dark" %}
       </div>
       <div class="flag-ribbon"></div>
     </div>
@@ -20,12 +20,13 @@
       <h1>AEOI-CRS Supervision Centre</h1>
       <p class="hero-lead">The internal command surface for the Automatic Exchange of Information under the Common Reporting Standard. Front-end filing, outbound exchange, and inbound receipt in one controlled environment.</p>
       <ul class="auth-points">
-        <li><span class="tick">&#10003;</span> Access by single-use credential issued by the administrator</li>
-        <li><span class="tick">&#10003;</span> Every credential admits one session within a fixed window</li>
+        <li><span class="tick">&#10003;</span> Access by credential issued by the administrator, valid for a fixed number of months</li>
+        <li><span class="tick">&#10003;</span> Daily sign-in during working hours, 08:00&ndash;18:00 (WAT), one live session at a time</li>
         <li><span class="tick">&#10003;</span> All actions written to an append-only audit trail</li>
       </ul>
     </div>
     <div class="hero-foot">
+      <span class="hero-tagline">Together we rise, together we prosper.</span><br>
       Automatic Exchange of Information &middot; Common Reporting Standard<br>
       Demonstration environment prepared by Seismic Consulting.
     </div>
@@ -48,7 +49,7 @@
         <input type="password" id="passcode" name="passcode" autocomplete="off" placeholder="XXXX-XXXX-XXXX" required>
         <button type="submit" class="btn block">Sign in</button>
       </form>
-      <p class="auth-foot">Credentials are single use and time-boxed. Once a session ends, the credential is consumed and a new one must be requested from the administrator.</p>
+      <p class="auth-foot">Credentials are time-boxed to a validity of whole months with daily access during working hours (08:00&ndash;18:00 WAT). When the validity window ends, a new credential must be requested from the administrator.</p>
       <a href="/" class="home-return">Return to home page</a>
     </div>
   </main>
