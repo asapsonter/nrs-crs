@@ -1,0 +1,138 @@
+{% extends "portal/base.html" %}
+{% block title %}{{ filing.get_kind_display }} · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<h1>{{ filing.get_kind_display }}</h1>
+<p class="page-sub">
+  {{ filing.name|default:filing.get_kind_display }} &middot;
+  <span class="mono">{{ filing.reference }}</span> &middot;
+  {{ filing.rfi.legal_name }}
+</p>
+
+{% if errors %}
+<div class="error-text">
+  {% for error in errors %}{{ error }}<br>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="/portal/filings/{{ filing.pk }}/notice/" class="stacked" id="notice-form">
+  {% csrf_token %}
+  {% if read_only %}
+  <div class="flash">Viewing this notice in read only mode.</div>
+  {% else %}
+  <p class="req-note">Fields marked <span class="req-star">*</span> are required to validate.</p>
+  {% endif %}
+
+  <section class="fset">
+    <div class="fset-head">
+      <span class="fset-num">1</span>
+      <div class="fset-heading">
+        <h2 class="fset-title">{{ filing.get_kind_display }}</h2>
+        {% if filing.kind == 'PU_CHANGE' %}
+        <p class="fset-hint">Details of the officer taking over as Primary User. On approval by the NRS, the new Primary User receives portal credentials and the outgoing Primary User's access ends.</p>
+        {% elif filing.kind == 'ENTITY_DEACTIVATION' %}
+        <p class="fset-hint">Request deactivation of this reporting entity. On approval by the NRS, the entity and all of its portal users are deactivated and no further filings can be made.</p>
+        {% else %}
+        <p class="fset-hint">The entity's registered details as they should appear after the change. The form starts from the details currently on record; amend what has changed. Applied on approval by the NRS.</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="fset-body">
+
+      {% if filing.kind == 'PU_CHANGE' %}
+      <div class="fset-grid">
+        <div class="field">
+          <label for="new_pu_surname" class="req">Surname</label>
+          <input type="text" name="new_pu_surname" id="new_pu_surname" value="{{ values.new_pu_surname }}" {% if read_only %}readonly{% endif %}>
+        </div>
+        <div class="field">
+          <label for="new_pu_middle_name">Middle name</label>
+          <input type="text" name="new_pu_middle_name" id="new_pu_middle_name" value="{{ values.new_pu_middle_name }}" {% if read_only %}readonly{% endif %}>
+        </div>
+        <div class="field">
+          <label for="new_pu_first_name" class="req">Other names</label>
+          <input type="text" name="new_pu_first_name" id="new_pu_first_name" value="{{ values.new_pu_first_name }}" {% if read_only %}readonly{% endif %}>
+        </div>
+      </div>
+      <div class="fset-grid">
+        <div class="field">
+          <label for="new_pu_designation" class="req">Position</label>
+          <input type="text" name="new_pu_designation" id="new_pu_designation" value="{{ values.new_pu_designation }}" {% if read_only %}readonly{% endif %}>
+        </div>
+        <div class="field">
+          <label for="new_pu_email" class="req">Email</label>
+          <input type="email" name="new_pu_email" id="new_pu_email" value="{{ values.new_pu_email }}" {% if read_only %}readonly{% endif %}>
+        </div>
+        <div class="field">
+          <label for="new_pu_phone" class="req">Phone</label>
+          <input type="text" name="new_pu_phone" id="new_pu_phone" value="{{ values.new_pu_phone }}" {% if read_only %}readonly{% endif %}>
+        </div>
+      </div>
+      <div class="field">
+        <label for="reason">Reason for the change</label>
+        <textarea name="reason" id="reason" rows="3" {% if read_only %}readonly{% endif %}>{{ values.reason }}</textarea>
+      </div>
+
+      {% elif filing.kind == 'ENTITY_DEACTIVATION' %}
+      <div class="fset-grid">
+        <div class="field">
+          <label for="effective_date" class="req">Effective date</label>
+          <input type="date" name="effective_date" id="effective_date" value="{{ values.effective_date }}" {% if read_only %}readonly{% endif %}>
+        </div>
+      </div>
+      <div class="field">
+        <label for="reason" class="req">Reason for deactivation</label>
+        <textarea name="reason" id="reason" rows="4" placeholder="e.g. the entity has ceased to be a Reporting Financial Institution, has wound up, or has merged" {% if read_only %}readonly{% endif %}>{{ values.reason }}</textarea>
+      </div>
+
+      {% else %}
+      <div class="fset-grid">
+        <div class="field">
+          <label for="legal_name" class="req">Legal name</label>
+          <input type="text" name="legal_name" id="legal_name" value="{{ values.legal_name }}" {% if read_only %}readonly{% endif %}>
+        </div>
+        <div class="field">
+          <label for="email" class="req">Financial Institution email</label>
+          <input type="email" name="email" id="email" value="{{ values.email }}" {% if read_only %}readonly{% endif %}>
+        </div>
+        <div class="field">
+          <label for="phone" class="req">Financial Institution phone</label>
+          <input type="text" name="phone" id="phone" value="{{ values.phone }}" {% if read_only %}readonly{% endif %}>
+        </div>
+      </div>
+      <div class="fset-grid">
+        <div class="field">
+          <label for="street" class="req">Street</label>
+          <input type="text" name="street" id="street" value="{{ values.street }}" {% if read_only %}readonly{% endif %}>
+        </div>
+        <div class="field">
+          <label for="city" class="req">City or town</label>
+          <input type="text" name="city" id="city" value="{{ values.city }}" {% if read_only %}readonly{% endif %}>
+        </div>
+        <div class="field">
+          <label for="state_province">State or province</label>
+          <input type="text" name="state_province" id="state_province" value="{{ values.state_province }}" {% if read_only %}readonly{% endif %}>
+        </div>
+        <div class="field">
+          <label for="post_code">Post code</label>
+          <input type="text" name="post_code" id="post_code" value="{{ values.post_code }}" {% if read_only %}readonly{% endif %}>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </section>
+
+  {% if read_only %}
+  <div class="actions-row" style="margin: 0;">
+    <a class="btn secondary" href="/portal/filings/{{ filing.pk }}/view/">Back to filing</a>
+  </div>
+  {% else %}
+  <p class="enrol-actions-note">Save as draft keeps your progress. Validate &amp; Save checks the form and makes the notice ready to submit.</p>
+  <div class="actions-row" style="margin: 0;">
+    <button type="submit" name="action" value="save" class="btn secondary">Save as draft</button>
+    <button type="submit" name="action" value="validate" class="btn">Validate &amp; Save</button>
+    <a class="btn ghost" href="/portal/filings/{{ filing.pk }}/view/">Cancel</a>
+  </div>
+  {% endif %}
+</form>
+{% endblock %}

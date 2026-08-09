@@ -5,7 +5,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from core import access, config, workhours
+from core import access, config
 from core.decorators import require_internal, superadmin_or_cap
 from core.models import AuditLog, IssuedCredential, OfficerProfile, Roles
 from portal.models import Filing, ReportingFI
@@ -22,26 +22,6 @@ def login_view(request):
         user = authenticate(request, username=username, password=passcode)
         if user is not None:
             credential: IssuedCredential | None = getattr(request, "_pending_credential", None)
-            # Officer sign-in runs during working hours only. The Super Admin
-            # (who administers access) and unlimited-validity credentials are
-            # not confined to the working day.
-            if (
-                credential is not None
-                and not credential.is_unlimited
-                and not workhours.within_working_hours()
-            ):
-                return render(
-                    request,
-                    "backoffice/login.html",
-                    {
-                        "error": (
-                            "Officer sign in is available during working hours only, "
-                            f"{workhours.working_hours_label()} (WAT). "
-                            "Your credential remains valid; sign in again from "
-                            f"{config.WORK_DAY_START_HOUR:02d}:00."
-                        )
-                    },
-                )
             login(request, user)
             if credential is not None:
                 # login() flushes any prior sign-in (for example the Super
@@ -54,16 +34,12 @@ def login_view(request):
                 credential.activate(request.session.session_key, user)
                 if first_use:
                     if credential.is_unlimited:
-                        detail = (
-                            "Credential activated with unlimited validity: no expiry "
-                            "and no working-hours confinement."
-                        )
+                        detail = "Credential activated with unlimited validity: no expiry."
                     else:
                         detail = (
                             f"Credential activated. Validity fixed at {credential.session_months} "
                             f"month{'s' if credential.session_months != 1 else ''}, ends "
-                            f"{timezone.localtime(credential.session_expires_at):%Y-%m-%d}. "
-                            f"Daily access {workhours.working_hours_label()}."
+                            f"{timezone.localtime(credential.session_expires_at):%Y-%m-%d}."
                         )
                     AuditLog.record(
                         actor_name=credential.officer.name,
@@ -151,14 +127,8 @@ def dashboard(request):
             "url": "/backoffice/registration/",
             "cap": access.VIEW_REGISTRATION,
         },
-        {
-            "label": "Filings awaiting validation",
-            "value": Filing.objects.filter(
-                status__in=[Filing.Status.SUBMITTED, Filing.Status.UNDER_VALIDATION]
-            ).count(),
-            "url": "/backoffice/returns/",
-            "cap": access.VIEW_RETURNS,
-        },
+        # Filings validate automatically against the CRS schema on submission,
+        # so the queue starts at approval: no "awaiting validation" figure.
         {
             "label": "Filings awaiting approval",
             "value": Filing.objects.filter(
@@ -197,7 +167,15 @@ def dashboard(request):
     ]
     for card in all_cards:
         card["clickable"] = card["cap"] in caps
-    return render(request, "backoffice/dashboard.html", {"cards": all_cards, "nav": "dashboard", "year": year})
+    context = {"cards": all_cards, "nav": "dashboard", "year": year, "show_reports": False}
+    # Reports & Insights render on the dashboard for officers whose roles
+    # carry the reports capability.
+    if access.VIEW_REPORTS in caps:
+        from backoffice.views_reports import reports_context
+
+        context.update(reports_context())
+        context["show_reports"] = True
+    return render(request, "backoffice/dashboard.html", context)
 
 
 @superadmin_or_cap(access.VIEW_AUDIT)

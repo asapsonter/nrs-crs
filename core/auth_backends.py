@@ -65,8 +65,8 @@ class IssuedCredentialBackend(BaseBackend):
                         flagged=True,
                     )
                 return None
-            # Daily re-login within the validity window: the previous session
-            # was ended (sign out or close of the working day).
+            # Re-login within the validity window after the previous session
+            # was ended (sign out, or an administrator sweep).
             if credential.session_expires_at and timezone.now() >= credential.session_expires_at:
                 credential.consume("Validity window elapsed at sign-in.")
                 return None

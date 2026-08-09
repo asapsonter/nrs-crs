@@ -16,9 +16,11 @@ from core import config
 from core.decorators import portal_required
 from core.models import AuditLog
 from exchange.services import days_to_domestic_deadline, domestic_deadline, next_doc_ref_id
-from portal.models import AccountReport, ControllingPerson, Filing, PortalUser
-from portal.services import next_filing_reference
-from portal.xml_ingest import parse_crs_upload
+from portal.models import AccountReport, ControllingPerson, Filing, PortalUser, ValidationFinding
+from portal.services import auto_validate_submission, next_filing_reference
+import re
+
+from portal.xml_ingest import parse_crs_upload, resolution_hint
 
 
 def _deadline_context() -> dict:
@@ -71,11 +73,16 @@ def filing_delete(request, filing_id: int):
     """
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
+    # Deletion is offered from both the filings list and Draft Filings;
+    # return the user to the page they acted from.
+    target = request.POST.get("next", "") or "/portal/filings/?mode=delete"
+    if not target.startswith("/portal/"):
+        target = "/portal/filings/?mode=delete"
     if request.method != "POST":
         return redirect("/portal/filings/?mode=delete")
     if not filing.is_deletable:
         messages.error(request, "A filing submitted to the NRS cannot be deleted.")
-        return redirect("/portal/filings/")
+        return redirect(target)
     reference = filing.reference
     _audit(
         profile,
@@ -86,7 +93,7 @@ def filing_delete(request, filing_id: int):
     )
     filing.delete()
     messages.success(request, f"Filing {reference} was deleted.")
-    return redirect("/portal/filings/?mode=delete")
+    return redirect(target)
 
 
 # Statuses in which the institution may still edit a filing. PENDING_CHECKER
@@ -243,6 +250,72 @@ def filing_crs_form(request, filing_id: int):
 
 
 @portal_required
+def filing_notice_form(request, filing_id: int):
+    """The administrative notice form: Primary User change, entity
+    deactivation, or change of entity information.
+
+    Mirrors the Vizor notice workflow: the form is edited from the Draft
+    Filing screen, Save as Draft keeps progress, Validate & Save requires
+    every mandatory field and marks the notice Ready to Submit.
+    """
+    profile = request.portal_profile
+    filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
+    if not filing.is_notice:
+        return redirect(f"/portal/filings/{filing.pk}/")
+    can_edit = filing.status in (*_OPEN_STATUSES, Filing.Status.RETURNED)
+    read_only = request.GET.get("mode") == "view" or not can_edit
+    required = Filing.NOTICE_REQUIRED_FIELDS[filing.kind]
+    keys = [key for key, _ in required] + list(Filing.NOTICE_OPTIONAL_FIELDS[filing.kind])
+
+    values = {key: filing.notice_payload.get(key, "") for key in keys}
+    if filing.kind == Filing.Kind.ENTITY_INFO_CHANGE and not filing.notice_payload:
+        # The change form starts from the entity's current registered
+        # details, as the Vizor portal pre-populates it from the FI profile.
+        rfi = profile.rfi
+        values.update(
+            legal_name=rfi.legal_name, street=rfi.street, city=rfi.city,
+            state_province=rfi.state_province, post_code=rfi.post_code,
+            email=rfi.email, phone=rfi.phone,
+        )
+
+    errors: list[str] = []
+    if request.method == "POST" and not read_only:
+        action = request.POST.get("action", "save")
+        values = {key: request.POST.get(key, "").strip() for key in keys}
+        if action == "validate":
+            for key, label in required:
+                if not values[key]:
+                    errors.append(f"{label} is required.")
+            email_key = "new_pu_email" if filing.kind == Filing.Kind.PU_CHANGE else "email"
+            if values.get(email_key) and "@" not in values[email_key]:
+                errors.append("Enter a valid email address.")
+        if not errors:
+            filing.notice_payload = {**values, "validated": action == "validate"}
+            filing.save(update_fields=["notice_payload"])
+            label = filing.get_kind_display()
+            if action == "validate":
+                _audit(profile, "NOTICE_VALIDATED", filing, f"{label} form validated and saved.")
+                messages.success(request, f"{label} validated and saved. The notice is ready to submit.")
+                return redirect(f"/portal/filings/{filing.pk}/view/")
+            _audit(profile, "NOTICE_DRAFTED", filing, f"{label} form saved as draft.")
+            messages.success(request, "Notice saved as draft.")
+            return redirect("/portal/filings/drafts/")
+
+    return render(
+        request,
+        "portal/filing_notice.html",
+        {
+            "filing": filing,
+            "values": values,
+            "errors": errors,
+            "read_only": read_only,
+            "nav": "filings",
+            **_deadline_context(),
+        },
+    )
+
+
+@portal_required
 def filing_view(request, filing_id: int):
     """Form-tree view of a filing: its CRS structure as an expandable folder
     hierarchy with per-node actions, in the manner of an AEOI filing console.
@@ -259,15 +332,19 @@ def filing_view(request, filing_id: int):
     header_done = bool(filing.receiving_country and filing.sending_company_in and filing.message_reference)
     records_complete = all(record.is_complete for record in records)
     incomplete_count = sum(1 for record in records if not record.is_complete)
-    # Ready to Submit: header validated and either a nil return or at least
-    # one account form, all of them complete.
-    ready_to_submit = header_done and (
-        filing.kind == Filing.Kind.NIL or (bool(records) and records_complete)
-    )
+    # Ready to Submit: a notice needs its form validated; a CRS return needs
+    # the header validated and either a nil return or at least one account
+    # form, all of them complete.
+    if filing.is_notice:
+        ready_to_submit = filing.notice_validated
+    else:
+        ready_to_submit = header_done and (
+            filing.kind == Filing.Kind.NIL or (bool(records) and records_complete)
+        )
     # Both Primary and Secondary Users prepare and submit open filings.
-    can_edit = (
-        filing.status in (Filing.Status.DRAFT, Filing.Status.PENDING_CHECKER)
-        and filing.kind in (Filing.Kind.MANUAL, Filing.Kind.XML_UPLOAD, Filing.Kind.EXCEL_UPLOAD)
+    can_edit = filing.status in (Filing.Status.DRAFT, Filing.Status.PENDING_CHECKER) and (
+        filing.kind in (Filing.Kind.MANUAL, Filing.Kind.XML_UPLOAD, Filing.Kind.EXCEL_UPLOAD)
+        or filing.is_notice
     )
     return render(
         request,
@@ -348,7 +425,27 @@ def filing_new_manual(request):
         created_by=profile,
     )
     _audit(profile, "FILING_CREATED", filing, "Manual entry filing opened as draft.", after=filing.status)
+    messages.success(
+        request,
+        f"{profile.display_name} ({profile.get_role_display()}), a manual entry draft filing "
+        f"({filing.reference}) has been created for {profile.rfi.legal_name}.",
+    )
     return redirect(f"/portal/filings/{filing.pk}/")
+
+
+_ERROR_LINE = re.compile(r"^Line (\d+)(?:, column \d+)?\s*[—:]?\s*(.*)$", re.S)
+
+
+def _upload_error_rows(errors: list[str]) -> list[dict]:
+    """Structure upload rejections for display: line, cause, resolution."""
+    rows = []
+    for message in errors:
+        line, cause = None, message
+        match = _ERROR_LINE.match(message)
+        if match:
+            line, cause = match.group(1), match.group(2)
+        rows.append({"line": line, "cause": cause, "hint": resolution_hint(message)})
+    return rows
 
 
 @portal_required
@@ -363,6 +460,22 @@ def filing_upload(request):
             errors = ["Choose a CRS XML file."]
         else:
             result = parse_crs_upload(upload.read(), config.CURRENT_REPORTING_YEAR)
+            # A DocRefId must be unique in space and time, so a document whose
+            # record identifiers are already on file is a resubmission rather
+            # than new data. Checked before anything is written so a rejected
+            # upload leaves no partial filing behind.
+            if result.ok:
+                incoming = [record.doc_ref_id for record in result.records if record.doc_ref_id]
+                already_filed = set(
+                    AccountReport.objects.filter(doc_ref_id__in=incoming).values_list("doc_ref_id", flat=True)
+                )
+                if already_filed:
+                    result.ok = False
+                    result.errors = [
+                        f"DocRefId '{doc_ref}' has already been filed. A corrected record must carry a "
+                        "new DocRefId with CorrDocRefId pointing at the record it replaces."
+                        for doc_ref in sorted(already_filed)[:10]
+                    ]
             if not result.ok:
                 errors = result.errors
             else:
@@ -394,9 +507,16 @@ def filing_upload(request):
                 for parsed in result.records:
                     record = AccountReport.objects.create(
                         filing=filing,
-                        doc_ref_id=next_doc_ref_id(profile.rfi, filing.reporting_year),
+                        # Keep the FI's own DocRefId so the correction chain it
+                        # started stays resolvable; the simplified CRSFiling
+                        # form carries none, so one is minted for it.
+                        doc_ref_id=parsed.doc_ref_id or next_doc_ref_id(profile.rfi, filing.reporting_year),
+                        doc_type_indic=parsed.doc_type_indic,
+                        corr_doc_ref_id=parsed.corr_doc_ref_id,
+                        source_line=parsed.source_line,
                         holder_name=parsed.holder_name,
                         holder_first_name=parsed.holder_first_name,
+                        holder_middle_name=parsed.holder_middle_name,
                         holder_last_name=parsed.holder_last_name,
                         holder_type=parsed.holder_type,
                         acct_holder_type=parsed.acct_holder_type,
@@ -406,6 +526,10 @@ def filing_upload(request):
                         address_country=parsed.address_country,
                         holder_street=parsed.holder_street,
                         holder_building_identifier=parsed.holder_building_identifier,
+                        holder_suite_identifier=parsed.holder_suite_identifier,
+                        holder_floor_identifier=parsed.holder_floor_identifier,
+                        holder_district_name=parsed.holder_district_name,
+                        holder_pob=parsed.holder_pob,
                         holder_post_code=parsed.holder_post_code,
                         holder_city=parsed.holder_city,
                         holder_country_subentity=parsed.holder_country_subentity,
@@ -429,6 +553,7 @@ def filing_upload(request):
                             account_report=record,
                             name=cp.name,
                             first_name=cp.first_name,
+                            middle_name=cp.middle_name,
                             last_name=cp.last_name,
                             residence_country=cp.residence_country,
                             tin=cp.tin,
@@ -437,18 +562,119 @@ def filing_upload(request):
                             birth_date=cp.birth_date,
                             ctrlg_person_type=cp.ctrlg_person_type,
                         )
-                _audit(
-                    profile,
-                    "FILING_UPLOADED",
-                    filing,
-                    f"CRS XML file {upload.name} accepted with {len(result.records)} records.",
-                    after=filing.status,
-                )
-                return redirect(f"/portal/filings/{filing.pk}/created/")
+                detail = f"CRS XML file {upload.name} accepted with {len(result.records)} records."
+                if result.contains_test_data:
+                    detail += " Document carried OECD10-OECD13 test-data indicators."
+                if result.warnings:
+                    detail += f" {len(result.warnings)} schema/consistency warning(s)."
+                _audit(profile, "FILING_UPLOADED", filing, detail, after=filing.status)
+
+                # Schema deviations and test-data indicators are recorded on
+                # the audit trail and surface to the Supervision Centre with
+                # the filing; the preparer sees a clean filed confirmation.
+                _validate_and_send_upload(profile, filing)
+                return redirect(f"/portal/filings/{filing.pk}/validation/")
     return render(
         request,
         "portal/filing_upload.html",
-        {"errors": errors, "nav": "filings", **_deadline_context()},
+        {
+            "errors": errors,
+            "error_rows": _upload_error_rows(errors),
+            "nav": "filings",
+            **_deadline_context(),
+        },
+    )
+
+
+def _validate_and_send_upload(profile: PortalUser, filing: Filing) -> bool:
+    """Validate an uploaded filing and send it on if it is clean.
+
+    An uploaded document is a complete return — it carries its own CRS message
+    header — so there is no separate submit step. Validation runs immediately
+    and decides:
+
+      errors present  the filing stays a Draft carrying its findings, for the
+                      institution to correct and resubmit;
+      no errors       it goes straight to the Supervision Centre.
+
+    Only ERROR findings hold a filing back. Warnings travel with it: several
+    (self-certification above all) describe due-diligence facts the CRS schema
+    has no element for, so an institution filing valid XML could never clear
+    them. They are for the Supervision Centre to weigh and override on the
+    record, which is what its override machinery exists for.
+
+    Returns True when the filing was sent.
+    """
+    # Imported here: backoffice.validation pulls in exchange models, which
+    # must not load at portal app import time.
+    from backoffice.validation import run_validation
+
+    run_validation(filing)
+    has_errors = filing.findings.filter(severity=ValidationFinding.Severity.ERROR).exists()
+    if has_errors:
+        _audit(
+            profile,
+            "FILING_VALIDATION_FAILED",
+            filing,
+            f"Validation found errors; filing held as a draft for correction "
+            f"({filing.findings.filter(severity=ValidationFinding.Severity.ERROR).count()} errors).",
+            after=filing.status,
+        )
+        return False
+
+    before = filing.status
+    filing.status = Filing.Status.SUBMITTED
+    filing.submitted_at = timezone.now()
+    filing.checker = profile
+    filing.save(update_fields=["status", "submitted_at", "checker"])
+    _audit(
+        profile,
+        "FILING_SUBMITTED",
+        filing,
+        "Validation passed on upload; filing sent to the Supervision Centre.",
+        before=before,
+        after=filing.status,
+    )
+    auto_validate_submission(filing)
+    return True
+
+
+@portal_required
+def filing_validation_report(request, filing_id: int):
+    """The validation outcome for an uploaded filing.
+
+    Shown straight after upload, and reachable afterwards from the filing, so
+    an institution can revisit exactly why a return was held back.
+    """
+    profile = request.portal_profile
+    filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
+    findings = filing.findings.select_related("account_report")
+    errors = [f for f in findings if f.severity == ValidationFinding.Severity.ERROR]
+    warnings = [f for f in findings if f.severity == ValidationFinding.Severity.WARNING]
+    return render(
+        request,
+        "portal/filing_validation.html",
+        {
+            "filing": filing,
+            "errors": errors,
+            "warnings": warnings,
+            "file_errors": [f for f in errors if f.account_report_id is None],
+            "record_errors": [f for f in errors if f.account_report_id is not None],
+            "was_sent": filing.status != Filing.Status.DRAFT,
+            "filed_by": filing.checker or filing.created_by or profile,
+            # XML line references only exist for records ingested from an
+            # uploaded document.
+            "show_lines": filing.kind == Filing.Kind.XML_UPLOAD,
+            "return_label": {
+                Filing.Kind.XML_UPLOAD: "CRS XML return",
+                Filing.Kind.EXCEL_UPLOAD: "CRS Excel return",
+                Filing.Kind.MANUAL: "CRS return",
+                Filing.Kind.NIL: "CRS nil return",
+            }.get(filing.kind, "return"),
+            "record_count": filing.account_reports.filter(superseded=False).count(),
+            "nav": "filings",
+            **_deadline_context(),
+        },
     )
 
 
@@ -589,7 +815,11 @@ def filing_nil(request):
         f"Nil return (CRS703) for {year} submitted to NRS.",
         after=filing.status,
     )
-    messages.success(request, f"Nil return for {year} submitted to the NRS.")
+    auto_validate_submission(filing)
+    messages.success(
+        request,
+        f"Nil return for {year} submitted to the NRS and passed automatic schema validation.",
+    )
     return redirect("/portal/filings/")
 
 
@@ -620,6 +850,10 @@ def _record_form_context() -> dict:
 def filing_detail(request, filing_id: int):
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
+    # An administrative notice has no account records; its home is the Form
+    # View, where the notice form is edited and submitted.
+    if filing.is_notice:
+        return redirect(f"/portal/filings/{filing.pk}/view/")
     records = filing.account_reports.all()
     flagged_ids = set(
         filing.findings.filter(account_report__isnull=False).values_list("account_report_id", flat=True)
@@ -879,6 +1113,8 @@ def controlling_person_add(request, filing_id: int, record_id: int):
         address=request.POST.get("cp_address", "").strip(),
         city=request.POST.get("cp_city", "").strip(),
         birth_date=parse_date(request.POST.get("cp_dob", "").strip() or "") or None,
+        birth_city=request.POST.get("cp_birth_city", "").strip(),
+        birth_country_code=request.POST.get("cp_birth_country", "").strip().upper(),
         ctrlg_person_type=cp_type,
     )
     _audit(profile, "CONTROLLING_PERSON_ADDED", filing, f"Controlling person added to {record.doc_ref_id}.")
@@ -915,7 +1151,11 @@ def filing_stage(request, filing_id: int):
     if filing.status not in (*_OPEN_STATUSES, Filing.Status.RETURNED):
         messages.error(request, "This filing cannot be submitted from its current status.")
         return redirect(f"/portal/filings/{filing.pk}/")
-    if filing.kind != Filing.Kind.NIL and not filing.account_reports.filter(superseded=False).exists():
+    if filing.is_notice:
+        if not filing.notice_validated:
+            messages.error(request, "Complete and validate the notice form before submitting.")
+            return redirect(f"/portal/filings/{filing.pk}/view/")
+    elif filing.kind != Filing.Kind.NIL and not filing.account_reports.filter(superseded=False).exists():
         messages.error(request, "Add at least one account report before submitting.")
         return redirect(f"/portal/filings/{filing.pk}/")
     before = filing.status
@@ -931,8 +1171,12 @@ def filing_stage(request, filing_id: int):
         before=before,
         after=filing.status,
     )
-    messages.success(request, f"{filing.reference} submitted to the NRS.")
-    return redirect(f"/portal/filings/{filing.pk}/")
+    auto_validate_submission(filing)
+    if filing.is_notice:
+        messages.success(request, f"{filing.reference} submitted to the NRS.")
+        return redirect(f"/portal/filings/{filing.pk}/view/")
+    # CRS data filings land on the filed-successfully screen.
+    return redirect(f"/portal/filings/{filing.pk}/validation/")
 
 
 # Retired: the maker-checker review step no longer exists. Both the Primary
@@ -994,5 +1238,17 @@ def filing_resubmit(request, filing_id: int):
         before=before,
         after=filing.status,
     )
-    messages.success(request, "Corrections resubmitted to the NRS.")
+    file_count, record_count = auto_validate_submission(filing)
+    findings = file_count + record_count
+    if findings:
+        messages.success(
+            request,
+            "Corrections resubmitted to the NRS. Automatic schema validation recorded "
+            f"{findings} finding{'s' if findings != 1 else ''} for NRS review.",
+        )
+    else:
+        messages.success(
+            request,
+            "Corrections resubmitted to the NRS and passed automatic schema validation.",
+        )
     return redirect(f"/portal/filings/{filing.pk}/")

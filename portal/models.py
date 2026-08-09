@@ -63,6 +63,7 @@ class ReportingFI(models.Model):
     pu_middle_name = models.CharField("Primary User middle name", max_length=80, blank=True, default="")
     pu_first_name = models.CharField("Primary User other names", max_length=80, blank=True, default="")
     pu_dob = models.DateField("Date of birth", null=True, blank=True)
+    pu_place_of_birth = models.CharField("Place of birth", max_length=200, blank=True, default="")
     pu_designation = models.CharField("Primary User position", max_length=120)
     pu_email = models.EmailField("Primary User email")
     pu_phone_cc = models.CharField("Primary User phone country code", max_length=6, blank=True, default="+234")
@@ -210,6 +211,35 @@ class Filing(models.Model):
     CRS_DATA_KINDS = (Kind.XML_UPLOAD, Kind.EXCEL_UPLOAD, Kind.MANUAL, Kind.NIL)
     NOTICE_KINDS = (Kind.PU_CHANGE, Kind.ENTITY_DEACTIVATION, Kind.ENTITY_INFO_CHANGE)
 
+    # The notice form fields per kind: required first, then optional. Shared
+    # by the portal notice form and the validation engine so the two can
+    # never disagree on what a complete notice contains.
+    NOTICE_REQUIRED_FIELDS = {
+        Kind.PU_CHANGE: (
+            ("new_pu_surname", "New Primary User surname"),
+            ("new_pu_first_name", "New Primary User other names"),
+            ("new_pu_designation", "New Primary User position"),
+            ("new_pu_email", "New Primary User email"),
+            ("new_pu_phone", "New Primary User phone"),
+        ),
+        Kind.ENTITY_DEACTIVATION: (
+            ("effective_date", "Effective date"),
+            ("reason", "Reason for deactivation"),
+        ),
+        Kind.ENTITY_INFO_CHANGE: (
+            ("legal_name", "Legal name"),
+            ("street", "Street"),
+            ("city", "City or town"),
+            ("email", "Financial Institution email"),
+            ("phone", "Financial Institution phone"),
+        ),
+    }
+    NOTICE_OPTIONAL_FIELDS = {
+        Kind.PU_CHANGE: ("new_pu_middle_name", "reason"),
+        Kind.ENTITY_DEACTIVATION: (),
+        Kind.ENTITY_INFO_CHANGE: ("state_province", "post_code"),
+    }
+
     class MessageType(models.TextChoices):
         CRS701 = "CRS701", "CRS701 New data"
         CRS702 = "CRS702", "CRS702 Corrections"
@@ -238,6 +268,12 @@ class Filing(models.Model):
     receiving_country = models.CharField("Receiving country", max_length=2, blank=True, default="")
     sending_company_in = models.CharField("Sending Company IN", max_length=40, blank=True, default="")
     message_reference = models.CharField("Message reference", max_length=80, blank=True, default="")
+
+    # Administrative notices (Primary User change, entity deactivation,
+    # change of entity information) carry their form data here rather than
+    # in account reports. `validated` is set by the notice form's
+    # Validate & Save and gates submission.
+    notice_payload = models.JSONField(default=dict, blank=True)
 
     created_by = models.ForeignKey(PortalUser, null=True, on_delete=models.SET_NULL, related_name="filings_created")
     checker = models.ForeignKey(PortalUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="filings_checked")
@@ -277,6 +313,28 @@ class Filing(models.Model):
     def is_crs_data(self) -> bool:
         """Whether this filing is a CRS data return (carries account reports)."""
         return self.kind in self.CRS_DATA_KINDS
+
+    @property
+    def is_notice(self) -> bool:
+        """Whether this filing is an administrative notice (no account data)."""
+        return self.kind in self.NOTICE_KINDS
+
+    @property
+    def fi_status_display(self) -> str:
+        """The status as shown to the institution.
+
+        Under Validation is the NRS's internal processing stage; from the
+        institution's side the filing is simply Submitted until the NRS
+        accepts it or returns it for correction.
+        """
+        if self.status == self.Status.UNDER_VALIDATION:
+            return "Submitted"
+        return self.get_status_display()
+
+    @property
+    def notice_validated(self) -> bool:
+        """Whether the notice form passed Validate & Save."""
+        return bool(self.notice_payload.get("validated"))
 
     @property
     def data_status(self) -> str:
@@ -376,6 +434,7 @@ class AccountReport(models.Model):
     # emitter falls back to NFN / free-format last name, which the User Guide
     # expressly permits.
     holder_first_name = models.CharField("First name", max_length=200, blank=True, default="")
+    holder_middle_name = models.CharField("Middle name", max_length=200, blank=True, default="")
     holder_last_name = models.CharField("Last name", max_length=200, blank=True, default="")
     holder_type = models.CharField(
         max_length=12,
@@ -401,6 +460,10 @@ class AccountReport(models.Model):
     address_country = models.CharField("Address country", max_length=2, blank=True, default="")
     holder_street = models.CharField("Street", max_length=200, blank=True, default="")
     holder_building_identifier = models.CharField("Building", max_length=200, blank=True, default="")
+    holder_suite_identifier = models.CharField("Suite", max_length=200, blank=True, default="")
+    holder_floor_identifier = models.CharField("Floor", max_length=200, blank=True, default="")
+    holder_district_name = models.CharField("District", max_length=200, blank=True, default="")
+    holder_pob = models.CharField("P.O. box", max_length=200, blank=True, default="")
     holder_post_code = models.CharField("Post code", max_length=200, blank=True, default="")
     holder_city = models.CharField("City", max_length=200, blank=True, default="")
     holder_country_subentity = models.CharField("State / region", max_length=200, blank=True, default="")
@@ -440,6 +503,10 @@ class AccountReport(models.Model):
     # A record replaced by a correction stays on the filing for lineage but
     # is excluded from validation and packaging.
     superseded = models.BooleanField(default=False)
+    # For records ingested from an XML upload: the line in the uploaded file
+    # where this AccountReport element starts, so findings can point the
+    # preparer back into their own document.
+    source_line = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ["doc_ref_id"]
@@ -523,6 +590,7 @@ class ControllingPerson(models.Model):
     # A controlling person is reported as a PersonParty_Type, so the same
     # FirstName/LastName Validation pair applies as for individual holders.
     first_name = models.CharField("First name", max_length=200, blank=True, default="")
+    middle_name = models.CharField("Middle name", max_length=200, blank=True, default="")
     last_name = models.CharField("Last name", max_length=200, blank=True, default="")
     residence_country = models.CharField("Residence jurisdiction", max_length=2)
     tin = models.CharField("TIN", max_length=40, blank=True, default="")
@@ -555,6 +623,34 @@ class ControllingPerson(models.Model):
         return self.address_country or self.residence_country
 
 
+# How to resolve each validation finding, by code. Shown beside the finding
+# on the institution's validation report.
+FINDING_RESOLUTIONS = {
+    "F-001": "Add at least one account report to the filing, or file a nil return for a year with nothing to report.",
+    "F-002": "Give this message a new, unused MessageRefId; every CRS message must carry its own unique reference.",
+    "R-101": "Provide the account holder's name.",
+    "R-102": "Provide the account number the institution uses for the account (or NANUM where no numbering system exists).",
+    "R-103": "Provide the holder's residence jurisdiction as a 2-letter ISO country code.",
+    "R-104": "Report the account under a jurisdiction on the activated CRS partner list, or remove the record until the jurisdiction is activated.",
+    "R-105": "Remove the duplicate: each account may appear once per filing. Report joint holders on a single record.",
+    "R-106": "Provide the account holder's address; it is mandatory in the CRS AccountHolder element.",
+    "R-107": "Classify the entity holder as CRS101 (Passive NFE with controlling persons), CRS102 (CRS Reportable Person) or CRS103 (Passive NFE that is itself reportable).",
+    "R-108": "Add at least one controlling person to the CRS101 Passive NFE account.",
+    "R-201": "Obtain and report the holder's TIN when the jurisdiction issues one; the reason recorded travels with the filing.",
+    "R-202": "Correct the TIN: 6-20 characters, letters and digits with common separators only.",
+    "R-204": "Report the holder's TIN, or record the reason it is unavailable (for example, the jurisdiction issues none).",
+    "R-205": "Record the holder's self-certification status collected under CRS due diligence.",
+    "R-206": "Pursue the outstanding self-certification; undocumented accounts are reported to the NRS as such.",
+    "R-301": "Report a negative balance as 0.00, per the CRS User Guide.",
+    "R-302": "Report a closed account with a zero balance alongside the ClosedAccount flag.",
+    "R-401": "Correct the account opening date: it cannot fall after the reporting year.",
+    "R-501": "Correct or delete a record only once per filing; merge the changes into a single corrected record.",
+    "R-502": "Point CorrDocRefId at the DocRefId of a record previously filed by your institution.",
+    "R-503": "Point CorrDocRefId at the DocRefId of the latest version of the record; the original was superseded by an earlier correction.",
+    "N-001": "Complete the missing field on the notice form, then Validate & Save.",
+}
+
+
 class ValidationFinding(models.Model):
     """A data-quality finding raised against a filing during validation.
 
@@ -581,6 +677,13 @@ class ValidationFinding(models.Model):
 
     class Meta:
         ordering = ["account_report__doc_ref_id", "code"]
+
+    @property
+    def resolution(self) -> str:
+        """How the institution resolves this finding."""
+        return FINDING_RESOLUTIONS.get(
+            self.code, "Correct the item described and submit the filing again."
+        )
 
     def __str__(self) -> str:
         return f"{self.code}: {self.message}"

@@ -89,7 +89,10 @@ def build(request):
         return redirect("/backoffice/exchange/")
     packages = build_packages(config.CURRENT_REPORTING_YEAR)
     if packages:
+        officer = request.credential.officer
         for package in packages:
+            package.responsible_officer = officer
+            package.save(update_fields=["responsible_officer"])
             _audit(
                 request,
                 "PACKAGE_BUILT",
@@ -110,7 +113,10 @@ def build_nil(request):
         return redirect("/backoffice/exchange/")
     packages = build_nil_packages(config.CURRENT_REPORTING_YEAR)
     if packages:
+        officer = request.credential.officer
         for package in packages:
+            package.responsible_officer = officer
+            package.save(update_fields=["responsible_officer"])
             _audit(
                 request,
                 "NIL_RETURN_BUILT",
@@ -207,6 +213,26 @@ def package_partner_response(request, package_id: int):
             after=package.status,
         )
         messages.success(request, "Accepted Status Message received. Package archived.")
+    elif outcome == "accept_warning":
+        note = request.POST.get("warning_detail", "").strip() or "Non-blocking data-quality warnings noted."
+        StatusMessage.objects.create(
+            direction=StatusMessage.Direction.INBOUND,
+            outcome=StatusMessage.Outcome.WARNING,
+            package=package,
+            detail=f"{package.jurisdiction.name} accepted {package.message_ref_id} with warnings: {note}",
+        )
+        package.status = ExchangePackage.Status.ARCHIVED
+        package.closed_at = timezone.now()
+        package.save()
+        _audit(
+            request,
+            "PACKAGE_ACCEPTED_WARNING",
+            package.message_ref_id,
+            f"Inbound Status Message: accepted with warnings. {note} Exchange cycle closed and archived.",
+            before=before,
+            after=package.status,
+        )
+        messages.success(request, "Accepted-with-warnings Status Message received. Package archived.")
     elif outcome == "file_error":
         code = request.POST.get("file_error_code", "50003")
         label = dict(FILE_ERROR_CHOICES).get(code, "File error")
@@ -380,9 +406,12 @@ def correct_package(request, package_id: int):
         return redirect("/backoffice/exchange/corrections/")
     correction = ExchangePackage.objects.create(
         jurisdiction=package.jurisdiction,
+        regime=package.regime,
         reporting_year=package.reporting_year,
         message_ref_id=next_message_ref_id(package.jurisdiction.code, package.reporting_year),
         message_type="CRS702",
+        file_version=package.file_version + 1,
+        responsible_officer=request.credential.officer,
         corrects_package=package,
     )
     correction.records.set(corrected_records)
@@ -444,6 +473,9 @@ def inbound_file_check(request, file_id: int):
     inbound = get_object_or_404(InboundFile, pk=file_id, status=InboundFile.Status.RECEIVED)
     if request.method != "POST":
         return redirect(f"/backoffice/exchange/inbound/{inbound.pk}/")
+    # The officer who first processes the file owns its review thereafter.
+    if inbound.assigned_reviewer_id is None:
+        inbound.assigned_reviewer = request.credential.officer
     if inbound.simulate_file_error:
         label = dict(FILE_ERROR_CHOICES).get(inbound.simulate_file_error, "File error")
         inbound.status = InboundFile.Status.FILE_ERROR
@@ -469,7 +501,7 @@ def inbound_file_check(request, file_id: int):
         messages.error(request, f"File-level check failed ({inbound.simulate_file_error} {label}). Rejection sent to the partner.")
     else:
         inbound.file_checked_at = timezone.now()
-        inbound.save(update_fields=["file_checked_at"])
+        inbound.save(update_fields=["file_checked_at", "assigned_reviewer"])
         _audit(
             request,
             "INBOUND_FILE_CHECK_PASSED",
@@ -698,4 +730,44 @@ def tax_authority_view(request):
         request,
         "backoffice/tax_authority_view.html",
         {"records": records, "counts": counts, "nav": "tav"},
+    )
+
+
+@require_cap(access.VIEW_EXCHANGE)
+def cts_monitoring(request):
+    """CTS monitoring: operational tiles, exception report, certificate inventory.
+
+    Serves RR-CTS-001 (dashboard), RR-CTS-003 (exceptions), FR-CTS-010 (alerts)
+    and OR-CTS-006 / AC-CTS-006 (certificate inventory and expiry alerts).
+    """
+    from exchange.models import TransmissionCertificate
+    from exchange.services import cts_exceptions
+
+    ex = cts_exceptions()
+    packages = ExchangePackage.objects.all()
+    tiles = {
+        "ready": packages.filter(status=ExchangePackage.Status.BUILT).count(),
+        "transmitted": packages.filter(status=ExchangePackage.Status.TRANSMITTED).count(),
+        "archived": packages.filter(status=ExchangePackage.Status.ARCHIVED).count(),
+        "failed": ex["failed_transmissions"].count(),
+        "pending_corrections": ex["pending_corrections"].count(),
+        "received": InboundFile.objects.exclude(status=InboundFile.Status.DISSEMINATED).count(),
+        "rejected_inbound": ex["rejected_inbound"].count(),
+        "expiring_certs": ex["expiring_certificates"].count(),
+    }
+    exception_total = (
+        tiles["failed"] + tiles["pending_corrections"] + tiles["rejected_inbound"]
+        + ex["unresolved_record_errors"].count() + tiles["expiring_certs"]
+    )
+    return render(
+        request,
+        "backoffice/cts_monitoring.html",
+        {
+            "tiles": tiles,
+            "exceptions": ex,
+            "exception_total": exception_total,
+            "certificates": TransmissionCertificate.objects.select_related("jurisdiction"),
+            "warning_days": config.CERTIFICATE_EXPIRY_WARNING_DAYS,
+            "nav": "cts-monitoring",
+        },
     )

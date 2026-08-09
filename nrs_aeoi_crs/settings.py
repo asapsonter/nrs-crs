@@ -121,8 +121,3 @@ CSRF_USE_SESSIONS = True
 CSRF_FAILURE_VIEW = "core.views.csrf_failure"
 
 LOGIN_URL = "/portal/login/"
-
-# Supervision Centre credential access is confined to the configured working
-# day (core.config.WORK_DAY_START_HOUR..WORK_DAY_END_HOUR, Africa/Lagos).
-# The test suite switches this off so login flows run at any time of day.
-ENFORCE_WORKING_HOURS = True

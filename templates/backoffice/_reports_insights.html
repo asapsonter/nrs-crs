@@ -1,10 +1,9 @@
-{% extends "backoffice/base.html" %}
 {% load flags %}
-{% block title %}Reports · NRS Supervision Centre{% endblock %}
-{% block content %}
-<h1>Management reports</h1>
-<p class="page-sub">Reporting year {{ year }}. Read-only analytical views across the AEOI-CRS workflow.</p>
-
+{% comment %}
+Reports & Insights: read-only analytical views across the AEOI-CRS
+workflow, rendered on the dashboard for officers with the reports
+capability.
+{% endcomment %}
 <div class="chart-wrap">
   <div class="chart-title">Filing funnel by status</div>
   <svg width="{{ funnel_chart.width }}" height="{{ funnel_chart.height }}" role="img">
@@ -79,4 +78,3 @@
   <dt>Packages not yet transmitted</dt><dd>{{ timeliness.outstanding }}</dd>
   <dt>Cycles closed and archived</dt><dd>{{ timeliness.archived }}</dd>
 </dl>
-{% endblock %}

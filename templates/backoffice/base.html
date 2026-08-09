@@ -20,6 +20,14 @@
       {% if user.is_superuser or credential %}
         <div class="nav-section">Overview</div>
         <a href="/backoffice/" class="{% if nav == 'dashboard' %}active{% endif %}">Dashboard</a>
+        {% if user.is_superuser %}
+          <div class="nav-section">Administration</div>
+          <a href="/backoffice/admin-console/" class="{% if nav == 'admin' %}active{% endif %}">Admin Console</a>
+          <a href="/backoffice/admin-console/officers/" class="{% if nav == 'officers' %}active{% endif %}">Users</a>
+          <a href="/backoffice/admin-console/sessions/" class="{% if nav == 'sessions' %}active{% endif %}">Live Sessions</a>
+          <a href="/backoffice/audit/" class="{% if nav == 'audit' %}active{% endif %}">Audit Log</a>
+          <a href="/backoffice/audit/credentials/" class="{% if nav == 'audit-credentials' %}active{% endif %}">Credential History</a>
+        {% endif %}
         {% if 'view_registration' in bo_caps %}
           <div class="nav-section">FI Management</div>
           <a href="/backoffice/registration/" class="{% if nav == 'registration' %}active{% endif %}">Enrolments</a>
@@ -33,6 +41,7 @@
         {% if 'view_exchange' in bo_caps or 'view_tax_authority' in bo_caps %}
           <div class="nav-section">Exchange &middot; CTS</div>
           {% if 'view_exchange' in bo_caps %}
+          <a href="/backoffice/exchange/monitoring/" class="{% if nav == 'cts-monitoring' %}active{% endif %}">CTS Monitoring</a>
           <a href="/backoffice/exchange/" class="{% if nav == 'exchange' %}active{% endif %}">Outbound Packages</a>
           <a href="/backoffice/exchange/corrections/" class="{% if nav == 'corrections' %}active{% endif %}">Correction Queue</a>
           <a href="/backoffice/exchange/inbound/" class="{% if nav == 'inbound' %}active{% endif %}">Inbound Files</a>
@@ -41,23 +50,10 @@
           <a href="/backoffice/exchange/tax-authority-view/" class="{% if nav == 'tav' %}active{% endif %}">Tax Authority View</a>
           {% endif %}
         {% endif %}
-        {% if 'view_reports' in bo_caps or 'view_audit' in bo_caps %}
+        {% if 'view_audit' in bo_caps and not user.is_superuser %}
           <div class="nav-section">AEOI Analytics</div>
-          {% if 'view_reports' in bo_caps %}
-          <a href="/backoffice/reports/" class="{% if nav == 'reports' %}active{% endif %}">Reports &amp; Insights</a>
-          {% endif %}
-          {% if 'view_audit' in bo_caps and not user.is_superuser %}
           <a href="/backoffice/audit/" class="{% if nav == 'audit' %}active{% endif %}">Audit Log</a>
-          {% endif %}
         {% endif %}
-      {% endif %}
-      {% if user.is_superuser %}
-        <div class="nav-section">Administration</div>
-        <a href="/backoffice/admin-console/" class="{% if nav == 'admin' %}active{% endif %}">Admin Console</a>
-        <a href="/backoffice/admin-console/officers/" class="{% if nav == 'officers' %}active{% endif %}">Users</a>
-        <a href="/backoffice/admin-console/sessions/" class="{% if nav == 'sessions' %}active{% endif %}">Live Sessions</a>
-        <a href="/backoffice/audit/" class="{% if nav == 'audit' %}active{% endif %}">Audit Log</a>
-        <a href="/backoffice/audit/credentials/" class="{% if nav == 'audit-credentials' %}active{% endif %}">Credential History</a>
       {% endif %}
     </nav>
     <div class="side-foot">
@@ -85,7 +81,7 @@
             </span>
             {% if credential_remaining_seconds is not None %}
             <span class="countdown" id="session-countdown" data-remaining="{{ credential_remaining_seconds }}"
-                  title="Time to the 18:00 close of the working day. Credential valid until {{ credential_valid_until|date:'j M Y' }}.">--:--</span>
+                  title="Time remaining on this credential. Valid until {{ credential_valid_until|date:'j M Y' }}.">--:--</span>
             {% endif %}
           {% elif user.is_superuser %}
             <span class="user-badge"><span class="user-name">Super Admin</span></span>

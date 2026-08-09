@@ -4,10 +4,12 @@
 {% block content %}
 <h1 class="mono">{{ package.message_ref_id }}</h1>
 <p class="page-sub">
+  <span class="pill neutral">{{ package.regime }}</span>
   {{ package.message_type }} to {{ package.jurisdiction.code|flag }}{{ package.jurisdiction.name }} ({{ package.jurisdiction.code }}) &middot;
-  Reporting year {{ package.reporting_year }} &middot; {% pill package.status package.get_status_display %}
+  Reporting year {{ package.reporting_year }} &middot; v{{ package.file_version }} &middot; {% pill package.status package.get_status_display %}
   {% if package.corrects_package %} &middot; corrects <a href="/backoffice/exchange/packages/{{ package.corrects_package.pk }}/" class="mono">{{ package.corrects_package.message_ref_id }}</a>{% endif %}
 </p>
+<p class="page-sub">Responsible officer: {{ package.responsible_officer.name|default:"Unassigned" }}</p>
 
 <div class="panel">
   <h2 style="margin-top: 0;">Transmission pipeline</h2>
@@ -65,6 +67,8 @@
     {% csrf_token %}
     <label>Response</label>
     <div class="checkbox-row"><input type="radio" name="outcome" value="accept" id="oc_accept" checked><label for="oc_accept" style="margin: 0;">Accept the package</label></div>
+    <div class="checkbox-row"><input type="radio" name="outcome" value="accept_warning" id="oc_warn"><label for="oc_warn" style="margin: 0;">Accept with warnings (non-blocking)</label></div>
+    <input type="text" name="warning_detail" placeholder="Warning detail (optional)" style="max-width: 480px;">
     <div class="checkbox-row"><input type="radio" name="outcome" value="file_error" id="oc_file"><label for="oc_file" style="margin: 0;">Reject with a file error</label></div>
     <select name="file_error_code" style="max-width: 320px;">
       {% for code, label in file_error_choices %}

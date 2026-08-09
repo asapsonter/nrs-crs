@@ -24,7 +24,6 @@ from django.utils import timezone
 from django.utils.cache import patch_vary_headers
 from django.utils.http import http_date
 
-from core import workhours
 from core.models import IssuedCredential
 
 PORTAL_PREFIX = "/portal/"
@@ -118,11 +117,9 @@ BACKOFFICE_EXEMPT = (
 class CredentialSessionMiddleware:
     """Enforces the issued-credential access window on every backoffice request.
 
-    Two clocks apply: the validity window (months, fixed at first use) and
-    the working day (08:00-18:00 local). Past the validity window the
-    credential is CONSUMED and the user logged out; past the working day the
-    session is merely unbound — the credential stays valid for the next
-    working day. A revoked credential ends its session on the next request.
+    One clock applies: the validity window (months, fixed at first use). Past
+    it the credential is CONSUMED and the user logged out. A revoked
+    credential ends its session on the next request.
     """
 
     def __init__(self, get_response):
@@ -166,21 +163,6 @@ class CredentialSessionMiddleware:
                     request,
                     "backoffice/access_ended.html",
                     {"reason": "Your credential's validity window has ended. Contact the administrator for a new credential."},
-                    status=403,
-                )
-            if not credential.is_unlimited and not workhours.within_working_hours():
-                credential.unbind("Working day closed. Session ended; credential remains valid.")
-                logout(request)
-                return render(
-                    request,
-                    "backoffice/access_ended.html",
-                    {
-                        "reason": (
-                            "The working day has closed. Access runs "
-                            f"{workhours.working_hours_label()} (WAT); your credential remains "
-                            "valid — sign in again during working hours."
-                        )
-                    },
                     status=403,
                 )
         elif credential.status != IssuedCredential.Status.ACTIVE:

@@ -4,9 +4,11 @@
 {% block content %}
 <h1 class="mono">{{ inbound.message_ref_id }}</h1>
 <p class="page-sub">
+  <span class="pill neutral">{{ inbound.regime }}</span>
   From {{ inbound.jurisdiction.code|flag }}{{ inbound.jurisdiction.name }} ({{ inbound.jurisdiction.code }}) &middot; Reporting year {{ inbound.reporting_year }} &middot;
   {% pill inbound.status inbound.get_status_display %}
 </p>
+<p class="page-sub">Assigned reviewer: {{ inbound.assigned_reviewer.name|default:"Unassigned" }}</p>
 
 <div class="panel">
   <h2 style="margin-top: 0;">Processing</h2>

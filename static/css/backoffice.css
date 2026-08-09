@@ -5,6 +5,35 @@
    alerts), ease-in-out micro-interactions. */
 
 @font-face {
+  font-family: "Raleway";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/raleway-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Raleway";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/raleway-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Raleway";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/raleway-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Roboto Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/roboto-mono-400.woff2") format("woff2");
+}
+
+@font-face {
   font-family: "Poppins";
   font-style: normal;
   font-weight: 400;
@@ -29,8 +58,9 @@
 :root {
   /* Accent (10%), per the NRS Brand Essentials sheet: Prosperity Red
      (Pantone 485C) for interactive elements and alerts only. */
-  --red: #D42E12;
-  --red-dark: #A82410;
+  --red: #972F31;
+  --red-dark: #7E1515;
+  --maroon-deep: #5E0001;
   /* Foundation Grey (Pantone 430C): identity marks and brand structure. */
   --foundation: #7D858B;
   --foundation-dark: #626A70;
@@ -49,7 +79,7 @@
   --border: #E5E7EB;
   --band: #F4F4F5;
   --band-light: #FAFAFA;
-  --error-tint: #FBEAE6;
+  --error-tint: #FEF2F2;
   /* 8pt spacing grid. */
   --s1: 8px;
   --s2: 16px;
@@ -90,7 +120,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: "Poppins", Tahoma, Verdana, "Segoe UI", system-ui, sans-serif;
+  font-family: "Raleway", "Poppins", Tahoma, Verdana, "Segoe UI", system-ui, sans-serif;
   color: var(--charcoal);
   background: #FFFFFF;
   font-size: var(--fs-body);
@@ -118,7 +148,7 @@ a:hover { color: var(--red-dark); }
 .bo-sidebar {
   width: 268px;
   min-width: 268px;
-  background: linear-gradient(180deg, #34343B 0%, #26262B 100%);
+  background: linear-gradient(180deg, #5E0001 0%, #3D0000 100%);
   color: #FFFFFF;
   display: flex;
   flex-direction: column;
@@ -181,7 +211,8 @@ a:hover { color: var(--red-dark); }
   font-size: 13.5px;
   transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), padding-left var(--dur) var(--ease);
 }
-/* Red indicator grows in from the centre on hover, fills when active. */
+/* White indicator grows in from the centre on hover, fills when active
+   (the rail itself is maroon, so the marker is light). */
 .bo-sidebar nav a::before {
   content: "";
   position: absolute;
@@ -190,7 +221,7 @@ a:hover { color: var(--red-dark); }
   bottom: 8px;
   width: 3px;
   border-radius: 2px;
-  background: var(--red);
+  background: #FFFFFF;
   transform: scaleY(0);
   opacity: 0;
   transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
@@ -202,7 +233,7 @@ a:hover { color: var(--red-dark); }
 }
 .bo-sidebar nav a:hover::before { transform: scaleY(0.5); opacity: 0.7; }
 .bo-sidebar nav a.active {
-  background: linear-gradient(90deg, rgba(212, 46, 18, 0.28) 0%, rgba(212, 46, 18, 0.06) 100%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.05) 100%);
   color: #FFFFFF;
   font-weight: 700;
 }
@@ -211,12 +242,24 @@ a:hover { color: var(--red-dark); }
   outline: 2px solid rgba(255, 255, 255, 0.7);
   outline-offset: -2px;
 }
+/* Group headings carry the rail's structure, so they are weighted to read as
+   headings rather than as faint labels: heavier, brighter, and separated from
+   the group above by a hairline. */
 .bo-sidebar .nav-section {
   padding: var(--s2) 14px var(--s1);
-  font-size: 10px;
+  font-size: 11.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1.2px;
-  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 1.1px;
+  color: rgba(255, 255, 255, 0.88);
+}
+.bo-sidebar .nav-section + a { margin-top: 2px; }
+/* Every heading but the first sits under a divider, so the groups read as
+   distinct blocks at a glance. */
+.bo-sidebar .nav-section:not(:first-child) {
+  margin-top: var(--s1);
+  padding-top: calc(var(--s2) + 2px);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 .bo-sidebar .side-foot {
   padding: var(--s2);
@@ -405,14 +448,15 @@ h2 { font-size: var(--fs-h2); font-weight: 600; margin: var(--s4) 0 var(--s2); }
 .stat-card {
   position: relative;
   overflow: hidden;
-  background: var(--charcoal-2);
+  background: var(--red);
   color: #FFFFFF;
   padding: var(--s3);
   text-decoration: none;
   display: block;
+  box-shadow: 0 2px 8px rgba(94, 0, 1, 0.16);
   transition: background-color var(--dur) var(--ease), transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-/* Red accent line sweeps across the top on hover. */
+/* White accent line sweeps across the top on hover (the card is red). */
 .stat-card::before {
   content: "";
   position: absolute;
@@ -420,7 +464,7 @@ h2 { font-size: var(--fs-h2); font-weight: 600; margin: var(--s4) 0 var(--s2); }
   top: 0;
   right: 0;
   height: 3px;
-  background: var(--red);
+  background: #FFFFFF;
   transform: scaleX(0);
   transform-origin: left;
   transition: transform var(--dur-slow) var(--ease);
@@ -430,12 +474,13 @@ h2 { font-size: var(--fs-h2); font-weight: 600; margin: var(--s4) 0 var(--s2); }
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: rgba(255,255,255,0.72);
+  color: rgba(255,255,255,0.78);
   line-height: 1.5;
   min-height: 32px;
 }
 .stat-card .value { font-size: 32px; font-weight: 700; margin-top: var(--s1); font-variant-numeric: tabular-nums; }
-.stat-card .value.alert { color: #FFB3B3; }
+/* Urgent figures turn amber: the one hue that still reads on the red card. */
+.stat-card .value.alert { color: #F6C560; }
 .stat-card .card-cta {
   margin-top: var(--s2);
   font-size: 11px;
@@ -445,21 +490,24 @@ h2 { font-size: var(--fs-h2); font-weight: 600; margin: var(--s4) 0 var(--s2); }
   color: rgba(255,255,255,0.85);
   transition: transform var(--dur) var(--ease);
 }
-.stat-card .card-cta.muted-cta { color: rgba(255,255,255,0.4); font-weight: 400; text-transform: none; letter-spacing: 0; }
-.stat-card:hover { background: #4A4A52; color: #FFFFFF; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(43, 43, 43, 0.18); }
+.stat-card .card-cta.muted-cta { color: rgba(255,255,255,0.5); font-weight: 400; text-transform: none; letter-spacing: 0; }
+.stat-card:hover { background: var(--red-dark); color: #FFFFFF; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(94, 0, 1, 0.28); }
 .stat-card:hover .card-cta { transform: translateX(3px); }
-/* Static cards are informational only: no hover lift, no accent, dimmed. */
+/* Static cards are informational only: no hover lift, no accent. They keep
+   to the red family as a soft tint so the grid reads as one system. */
 .stat-card.static {
-  background: var(--band);
-  color: var(--charcoal);
+  background: var(--error-tint);
+  color: var(--red-dark);
+  border: 1px solid #FECACA;
+  box-shadow: none;
   cursor: default;
 }
 .stat-card.static::before { display: none; }
-.stat-card.static:hover { background: var(--band); transform: none; box-shadow: none; }
-.stat-card.static .label { color: var(--gray-muted); }
-.stat-card.static .value { color: var(--charcoal-2); }
-.stat-card.static .value.alert { color: var(--red-dark); }
-.stat-card.static .card-cta.muted-cta { color: var(--gray-muted); }
+.stat-card.static:hover { background: var(--error-tint); transform: none; box-shadow: none; }
+.stat-card.static .label { color: #A9575A; }
+.stat-card.static .value { color: var(--red-dark); }
+.stat-card.static .value.alert { color: var(--red); }
+.stat-card.static .card-cta.muted-cta { color: #A9575A; }
 
 .panel {
   border: 1px solid var(--border);
@@ -484,7 +532,7 @@ table.data {
   font-size: 13px;
 }
 table.data thead th {
-  background: linear-gradient(180deg, #45454D 0%, #3F3F46 100%);
+  background: linear-gradient(180deg, #A03D3D 0%, var(--red) 100%);
   color: #FFFFFF;
   text-align: left;
   font-size: 10.5px;
@@ -502,8 +550,8 @@ table.data td {
   transition: background-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 table.data tbody tr:last-child td { border-bottom: none; }
-table.data tbody tr:nth-child(even) td { background: #FCFCFD; }
-table.data tbody tr:hover td { background: #F5F5F7; }
+table.data tbody tr:nth-child(even) td { background: #FDFBFB; }
+table.data tbody tr:hover td { background: #FAF3F3; }
 /* A red accent slides in at the left edge of the hovered row. */
 table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 /* Extra breathing room at the card edges. */
@@ -556,7 +604,7 @@ table.data td.muted { color: var(--gray-muted); }
   font-size: 11px;
   line-height: 1;
 }
-.pill.rejected, .pill.error { background: #FBEAE6; color: #A82410; border-color: #F2C4B8; }
+.pill.rejected, .pill.error { background: #FEF2F2; color: #991B1B; border-color: #FECACA; }
 .pill.correction { background: #FCEDE6; color: #B23A10; border-color: #EDB79E; }
 
 /* Forms: labels sit close to their inputs; groups separated by grid steps. */
@@ -687,7 +735,7 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"], .checkbox
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: none; }
 }
-.flash.error { background: var(--error-tint); color: var(--red-dark); border-color: #F2C4B8; }
+.flash.error { background: var(--error-tint); color: var(--red-dark); border-color: #FECACA; }
 .flash.success {
   background: var(--green-tint);
   color: var(--green-dark);
@@ -742,8 +790,8 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"], .checkbox
   animation: dot-pulse 2s var(--ease) infinite;
 }
 @keyframes dot-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(212, 46, 18, 0.10); }
-  50% { box-shadow: 0 0 0 6px rgba(212, 46, 18, 0.20); }
+  0%, 100% { box-shadow: 0 0 0 3px rgba(151, 47, 49, 0.10); }
+  50% { box-shadow: 0 0 0 6px rgba(151, 47, 49, 0.20); }
 }
 
 pre.xml {
@@ -796,7 +844,7 @@ pre.xml {
 .btn-back:focus-visible { outline: 2px solid var(--charcoal-2); outline-offset: 2px; }
 
 .muted { color: var(--gray-muted); font-size: var(--fs-small); }
-.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--fs-small); }
+.mono { font-family: "Roboto Mono", ui-monospace, Menlo, Consolas, monospace; font-size: var(--fs-small); }
 /* Country flags: sit just ahead of a jurisdiction code or name. */
 .flag { font-size: 1.08em; line-height: 1; margin-right: 6px; vertical-align: -1px; }
 .country { white-space: nowrap; }
@@ -829,7 +877,7 @@ pre.xml {
   background:
     repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 14px),
     repeating-linear-gradient(-45deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 14px),
-    linear-gradient(150deg, #45454D 0%, #2B2B2B 100%);
+    linear-gradient(135deg, #A03D3D 0%, #7E1515 55%, #5E0001 100%);
   color: #FFFFFF;
   padding: var(--s5);
   display: flex;
@@ -845,7 +893,7 @@ pre.xml {
   right: -140px;
   width: 360px;
   height: 360px;
-  background: radial-gradient(circle, rgba(212, 46, 18, 0.30), transparent 70%);
+  background: radial-gradient(circle, rgba(151, 47, 49, 0.30), transparent 70%);
   pointer-events: none;
 }
 .auth-hero::after {
@@ -877,8 +925,8 @@ pre.xml {
   flex: none;
   width: 22px; height: 22px;
   border-radius: 50%;
-  border: 1px solid rgba(212, 46, 18, 0.9);
-  background: rgba(212, 46, 18, 0.16);
+  border: 1px solid rgba(151, 47, 49, 0.9);
+  background: rgba(151, 47, 49, 0.16);
   color: #FF9B9B;
   display: flex; align-items: center; justify-content: center;
   font-size: 12px;
@@ -978,7 +1026,7 @@ pre.xml {
 .risk.risk-general::before { background: #64748B; }
 .risk.risk-specific { background: #FDF3E3; color: #96610C; border-color: #EFD3A0; }
 .risk.risk-specific::before { background: #D08908; }
-.risk.risk-enhanced { background: var(--error-tint); color: var(--red-dark); border-color: #F2C4B8; }
+.risk.risk-enhanced { background: var(--error-tint); color: var(--red-dark); border-color: #FECACA; }
 .risk.risk-enhanced::before { background: var(--red); animation: dot-pulse 2s var(--ease) infinite; }
 
 .match-summary {
@@ -1101,7 +1149,7 @@ table.data tbody tr:nth-child(n+7) { animation-delay: 150ms; }
 .bo-tree-row.depth-2 { padding-left: 58px; }
 .bo-tree-row.is-superseded { opacity: 0.55; }
 .bt-tag {
-  font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  font-family: "Roboto Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
   font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em;
   padding: 2px 7px; border-radius: 5px; flex: none;
 }
@@ -1182,3 +1230,139 @@ form.stacked .name-grid input { width: 100%; max-width: none; }
 .bo-sidebar .brand a.brand-lockup .sys { font-size: var(--fs-small); color: rgba(255, 255, 255, 0.7); }
 /* Brand tagline on the sign-in hero. */
 .auth-hero .hero-tagline { font-style: italic; font-weight: 600; color: #FF8A73; }
+
+
+/* Surface language from selfservice.nrs.gov.ng: rounded corners and soft
+   card shadows over white, in the manner of the taxpayer self-service
+   portal. Appended last so these override the flat defaults above. */
+.btn { border-radius: 8px; }
+.panel { border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+form.stacked input, form.stacked select, form.stacked textarea { border-radius: 8px; }
+.flash { border-radius: 10px; }
+.error-text { border-radius: 8px; }
+table.data { border-radius: 10px; overflow: hidden; }
+
+
+/* ---------------------------------------------------------------------- */
+/* Polish layer: sticky chrome, slim scrollbars, the rounded-surface       */
+/* language extended to the components the earlier override missed,        */
+/* responsive coverage (the Supervision Centre previously had none), and   */
+/* print output. Appended last so it wins the cascade.                     */
+/* ---------------------------------------------------------------------- */
+
+/* The page gutter is reserved up front so layout never shifts between
+   short and long pages. */
+html { scrollbar-gutter: stable; }
+
+/* Text selection carries the brand accent. */
+::selection { background: var(--red); color: #FFFFFF; }
+
+/* Slim scrollbars on the nav rail and XML panes. */
+.bo-sidebar nav { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent; }
+.bo-sidebar nav::-webkit-scrollbar { width: 8px; }
+.bo-sidebar nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); border-radius: 4px; }
+pre.xml { scrollbar-width: thin; scrollbar-color: #C9CDD3 transparent; }
+pre.xml::-webkit-scrollbar { width: 8px; height: 8px; }
+pre.xml::-webkit-scrollbar-thumb { background: #C9CDD3; border-radius: 4px; }
+
+/* The rail and header hold their place on long queues. Scoped to widths
+   where the rail is a column; below 860px the layout stacks. */
+@media (min-width: 861px) {
+  .bo-sidebar { position: sticky; top: 0; height: 100vh; }
+  .bo-header { position: sticky; top: 0; }
+}
+
+/* Rounded-surface language extended to the components the earlier
+   override missed. */
+.stat-card { border-radius: 12px; }
+.chart-wrap { border-radius: 12px; box-shadow: 0 1px 2px rgba(24, 24, 27, 0.04); }
+pre.xml { border-radius: 10px; }
+.login-box { border-radius: 12px; box-shadow: 0 10px 34px rgba(24, 24, 27, 0.08); }
+
+/* Wide tables scroll within their own container so the page never scrolls
+   sideways (parity with the portal). */
+.table-wrap { overflow-x: auto; margin-bottom: var(--s2); }
+.table-wrap table.data { margin-bottom: 0; }
+
+/* Responsive layout: the stat grid steps down, then the rail becomes a
+   wrapping top bar and the tiles stack. */
+@media (max-width: 1100px) {
+  .card-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 860px) {
+  .bo-layout { flex-direction: column; }
+  .bo-sidebar { width: 100%; min-width: 0; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16); }
+  /* The national ribbon moves from the rail's right edge to its underside. */
+  .bo-sidebar::after {
+    left: 0; right: 0; top: auto; bottom: 0;
+    width: auto; height: 3px;
+    background: linear-gradient(90deg, var(--green) 0 33.33%, #FFFFFF 33.33% 66.66%, var(--green) 66.66% 100%);
+  }
+  .bo-sidebar nav { display: flex; flex-wrap: wrap; gap: 2px; }
+  .bo-sidebar nav a { margin-bottom: 0; }
+  /* The rail wraps into rows here; headings stay full-width separators but
+     lose the taller spacing the vertical rail needs. */
+  .bo-sidebar .nav-section,
+  .bo-sidebar .nav-section:not(:first-child) { flex-basis: 100%; padding-top: var(--s1); margin-top: 0; }
+  .bo-sidebar .side-foot .side-note { display: none; }
+  .bo-header { flex-wrap: wrap; gap: var(--s1) var(--s2); padding: var(--s2) var(--s3); }
+  .bo-content { padding: var(--s3) var(--s2); }
+  .risk-summary { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .card-grid, .risk-summary { grid-template-columns: 1fr; }
+  .kv { grid-template-columns: 1fr; row-gap: 2px; }
+  .kv dt { margin-top: var(--s1); }
+  .kv dt:first-of-type { margin-top: 0; }
+}
+
+/* Print: the record, not the chrome. Animations are also disabled because
+   `animation-fill-mode: both` could otherwise print a page at opacity 0. */
+@media print {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .bo-sidebar, .bo-header, .back-nav, .actions-row, .btn, .flag-ribbon { display: none !important; }
+  .bo-content { max-width: none; padding: 0; }
+  table.data, .panel, .chart-wrap, .stat-card { box-shadow: none; }
+  table.data thead th { background: var(--red); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+
+/* ---------------------------------------------------------------------- */
+/* Prosperity Red accents across the Supervision Centre: red table         */
+/* headers (set at the table rules above), red-crowned panels, and small   */
+/* red marks on the secondary chrome.                                      */
+/* ---------------------------------------------------------------------- */
+
+/* A red hairline closes the page header, carrying the brand accent across
+   every screen. */
+.bo-header {
+  box-shadow: 0 2px 6px rgba(43, 43, 43, 0.04), inset 0 -2px 0 var(--red);
+}
+
+/* Panels are crowned by a red top rule, matching the login box. The
+   decision gate keeps its amber identity. */
+.panel { border-top: 3px solid var(--red); }
+.panel.decision-gate { border-top-color: #D08908; }
+
+/* Chart titles pick up the section-heading red bar. */
+.chart-title { position: relative; padding-left: 12px; }
+.chart-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.15em;
+  bottom: 0.15em;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--red);
+}
+
+/* XML panes carry a red spine. */
+pre.xml { border-left: 3px solid var(--red); }
+
+/* Officer role chips move from neutral gray into the red family. */
+.bo-header .role-chip {
+  background: var(--error-tint);
+  border-color: #FECACA;
+  color: var(--red-dark);
+}

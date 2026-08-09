@@ -25,6 +25,7 @@
     <dt>Name</dt><dd>{{ rfi.pu_surname }}, {{ rfi.pu_first_name }}{% if rfi.pu_middle_name %} {{ rfi.pu_middle_name }}{% endif %}</dd>
     <dt>Position</dt><dd>{{ rfi.pu_designation }}</dd>
     <dt>Date of birth</dt><dd>{% if rfi.pu_dob %}{{ rfi.pu_dob|date:"j M Y" }}{% else %}Not provided{% endif %}</dd>
+    <dt>Place of birth</dt><dd>{{ rfi.pu_place_of_birth|default:"Not provided" }}</dd>
     <dt>Email</dt><dd>{{ rfi.pu_email }}</dd>
     <dt>Telephone</dt><dd>{{ rfi.pu_full_phone }}</dd>
   </dl>

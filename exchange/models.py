@@ -4,8 +4,23 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.db import models
+from django.utils import timezone
 
+from core import config
+from core.models import OfficerProfile
 from portal.models import AccountReport
+
+
+class Regime(models.TextChoices):
+    """Reporting regime an exchange file belongs to.
+
+    CRS is live today; CARF is declared so the register, status-message and
+    correction machinery is regime-aware and reusable, per the OECD design
+    where the CARF Status Message schema mirrors the CRS one.
+    """
+
+    CRS = "CRS", "CRS"
+    CARF = "CARF", "CARF"
 
 
 class PartnerJurisdiction(models.Model):
@@ -54,8 +69,15 @@ class ExchangePackage(models.Model):
         ARCHIVED = "ARCHIVED", "Archived"
 
     jurisdiction = models.ForeignKey(PartnerJurisdiction, on_delete=models.PROTECT, related_name="packages")
+    regime = models.CharField(max_length=4, choices=Regime.choices, default=Regime.CRS)
     reporting_year = models.PositiveIntegerField()
     message_ref_id = models.CharField(max_length=40, unique=True)
+    # File version within a correction lineage: 1 for the original, incremented
+    # on each CRS702 correction so retransmissions stay individually traceable.
+    file_version = models.PositiveSmallIntegerField(default=1)
+    responsible_officer = models.ForeignKey(
+        OfficerProfile, null=True, blank=True, on_delete=models.SET_NULL, related_name="exchange_packages"
+    )
     message_type = models.CharField(
         max_length=8,
         choices=[
@@ -111,6 +133,7 @@ class StatusMessage(models.Model):
 
     class Outcome(models.TextChoices):
         ACCEPTED = "ACCEPTED", "Accepted"
+        WARNING = "WARNING", "Accepted with warnings"
         FILE_ERROR = "FILE_ERROR", "File error"
         RECORD_ERROR = "RECORD_ERROR", "Record errors"
 
@@ -193,9 +216,13 @@ class InboundFile(models.Model):
         DISSEMINATED = "DISSEMINATED", "Disseminated"
 
     jurisdiction = models.ForeignKey(PartnerJurisdiction, on_delete=models.PROTECT, related_name="inbound_files")
+    regime = models.CharField(max_length=4, choices=Regime.choices, default=Regime.CRS)
     reporting_year = models.PositiveIntegerField()
     message_ref_id = models.CharField(max_length=40, unique=True)
     status = models.CharField(max_length=14, choices=Status.choices, default=Status.RECEIVED)
+    assigned_reviewer = models.ForeignKey(
+        OfficerProfile, null=True, blank=True, on_delete=models.SET_NULL, related_name="inbound_files_reviewed"
+    )
     simulate_file_error = models.CharField(max_length=10, blank=True, default="")
     received_at = models.DateTimeField(auto_now_add=True)
     file_checked_at = models.DateTimeField(null=True, blank=True)
@@ -253,3 +280,56 @@ class InboundRecord(models.Model):
 
     def __str__(self) -> str:
         return f"{self.doc_ref_id} {self.holder_name}"
+
+
+class TransmissionCertificate(models.Model):
+    """A cryptographic certificate in the CTS certificate inventory.
+
+    Covers the NRS's own signing certificate and each partner jurisdiction's
+    public-key certificate. Validity is monitored against a renewal schedule
+    so certificates are renewed before they lapse (OR-CTS-006); a certificate
+    within the warning window, or already expired, raises a CTS exception
+    alert (FR-CTS-010, RR-CTS-003, AC-CTS-006).
+    """
+
+    class Owner(models.TextChoices):
+        NRS = "NRS", "NRS own signing certificate"
+        PARTNER = "PARTNER", "Partner jurisdiction"
+
+    owner = models.CharField(max_length=8, choices=Owner.choices, default=Owner.PARTNER)
+    jurisdiction = models.ForeignKey(
+        PartnerJurisdiction, null=True, blank=True, on_delete=models.CASCADE, related_name="certificates"
+    )
+    subject = models.CharField(max_length=120)
+    fingerprint = models.CharField(max_length=64)
+    valid_from = models.DateField()
+    valid_to = models.DateField()
+    revoked = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["valid_to"]
+
+    def __str__(self) -> str:
+        return f"{self.subject} (to {self.valid_to})"
+
+    @property
+    def days_to_expiry(self) -> int:
+        return (self.valid_to - timezone.localdate()).days
+
+    @property
+    def is_expired(self) -> bool:
+        return self.revoked or self.days_to_expiry < 0
+
+    @property
+    def is_expiring(self) -> bool:
+        return not self.is_expired and self.days_to_expiry <= config.CERTIFICATE_EXPIRY_WARNING_DAYS
+
+    @property
+    def status_label(self) -> str:
+        if self.revoked:
+            return "Revoked"
+        if self.is_expired:
+            return "Expired"
+        if self.is_expiring:
+            return "Expiring"
+        return "Valid"

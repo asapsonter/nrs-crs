@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 
+from django.db.models import Q
+
 from exchange.models import PartnerJurisdiction
 from portal.models import AccountReport, Filing, ValidationFinding
 
@@ -37,8 +39,84 @@ def run_validation(filing: Filing) -> tuple[int, int]:
             )
         )
 
+    # An administrative notice carries a form payload, not account reports;
+    # its validation is completeness of that form.
+    if filing.is_notice:
+        for key, label in Filing.NOTICE_REQUIRED_FIELDS[filing.kind]:
+            if not str(filing.notice_payload.get(key, "")).strip():
+                file_finding("ERROR", "N-001", f"{label} is missing from the notice.")
+        ValidationFinding.objects.bulk_create(findings)
+        return len(findings), 0
+
     if filing.kind != Filing.Kind.NIL and not records:
         file_finding("ERROR", "F-001", "The filing contains no account reports.")
+
+    # A MessageRefId identifies one CRS message for all time, so a reference
+    # already carried by another filing can never be sent again.
+    if filing.message_reference.strip():
+        clash = (
+            Filing.objects.exclude(pk=filing.pk)
+            .filter(message_reference=filing.message_reference)
+            .first()
+        )
+        if clash:
+            file_finding(
+                "ERROR",
+                "F-002",
+                f"MessageRefId '{filing.message_reference}' is already in use by filing "
+                f"{clash.reference}. Every CRS message must carry its own unique MessageRefId.",
+            )
+
+    # Correction-chain integrity. A CorrDocRefId must point at the latest
+    # previously filed version of a record, and each version may be corrected
+    # or deleted only once — a second correction must reference the DocRefId
+    # of the record that superseded it, or the chain becomes unresolvable.
+    seen_corr: dict[str, AccountReport] = {}
+    for record in records:
+        corr = record.corr_doc_ref_id.strip()
+        if not corr:
+            continue
+        if corr in seen_corr:
+            record_finding(
+                record,
+                "ERROR",
+                "R-501",
+                f"CorrDocRefId '{corr}' is used more than once in this filing. A record "
+                "cannot be corrected or deleted twice in the same filing.",
+            )
+            continue
+        seen_corr[corr] = record
+        # The referenced record must exist for this institution: either in a
+        # filing already sent to the NRS, or superseded within this filing by
+        # the returned-for-correction amendment flow.
+        target_exists = (
+            AccountReport.objects.filter(doc_ref_id=corr, filing__rfi=filing.rfi)
+            .filter(Q(filing=filing) | ~Q(filing__status=Filing.Status.DRAFT))
+            .exclude(pk=record.pk)
+            .exists()
+        )
+        if not target_exists:
+            record_finding(
+                record,
+                "ERROR",
+                "R-502",
+                f"CorrDocRefId '{corr}' does not match the DocRefId of any previously "
+                "filed record for this institution.",
+            )
+        elif (
+            AccountReport.objects.filter(corr_doc_ref_id=corr)
+            .exclude(filing=filing)
+            .exclude(filing__status=Filing.Status.DRAFT)
+            .exists()
+        ):
+            record_finding(
+                record,
+                "ERROR",
+                "R-503",
+                f"The record with DocRefId '{corr}' has already been corrected by a "
+                "previously submitted filing, which supersedes it. Point CorrDocRefId "
+                "at the DocRefId of the latest version of the record.",
+            )
 
     # Duplicate account detection within the filing.
     seen: dict[str, AccountReport] = {}

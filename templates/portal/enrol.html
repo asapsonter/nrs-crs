@@ -129,18 +129,22 @@
           <input type="text" name="pu_surname" id="pu_surname" value="{{ values.pu_surname|default:'' }}" required>
         </div>
         <div class="field">
-          <label for="pu_middle_name">Middle name</label>
-          <input type="text" name="pu_middle_name" id="pu_middle_name" value="{{ values.pu_middle_name|default:'' }}">
-        </div>
-        <div class="field">
-          <label for="pu_first_name">Other names</label>
+          <label for="pu_first_name">Firstname</label>
           <input type="text" name="pu_first_name" id="pu_first_name" value="{{ values.pu_first_name|default:'' }}" required>
         </div>
+        <div class="field">
+          <label for="pu_middle_name">Others</label>
+          <input type="text" name="pu_middle_name" id="pu_middle_name" value="{{ values.pu_middle_name|default:'' }}">
+        </div>
       </div>
-      <div class="fset-grid">
+      <div class="fset-grid three">
         <div class="field">
           <label for="pu_dob">Date of birth</label>
           <input type="date" name="pu_dob" id="pu_dob" value="{{ values.pu_dob|default:'' }}" required>
+        </div>
+        <div class="field">
+          <label for="pu_place_of_birth">Place of birth</label>
+          <input type="text" name="pu_place_of_birth" id="pu_place_of_birth" value="{{ values.pu_place_of_birth|default:'' }}" placeholder="City, State, Country" required>
         </div>
         <div class="field">
           <label for="pu_designation">Position</label>
@@ -178,7 +182,11 @@
   </section>
 
   <div class="enrol-actions">
-    <p class="enrol-actions-note">By submitting, you confirm the information provided is accurate and complete.</p>
+    <label class="enrol-actions-note enrol-confirm">
+      <input type="checkbox" name="confirm_accuracy" value="yes" required
+             {% if values.confirm_accuracy %}checked{% endif %}>
+      <span>I confirm the information provided is accurate and complete.</span>
+    </label>
     <button type="submit" class="btn">Submit application</button>
   </div>
   </div><!-- /.enrol-form-body -->

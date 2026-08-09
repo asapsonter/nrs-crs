@@ -3,7 +3,7 @@
 {% block content %}
 {% include "portal/deadline_banner.html" %}
 <h1>CRS Excel Upload Filing</h1>
-<p class="page-sub">Upload a CRS filing prepared in the Excel template (.xlsx), or the same template saved as a .csv file. Each row is one reportable account; the file is validated on upload before any records are created.</p>
+<p class="page-sub">Attach your completed CRS template and submit.</p>
 
 {% if errors %}
 <div class="error-text">
@@ -11,15 +11,17 @@
 </div>
 {% endif %}
 
-<form method="post" enctype="multipart/form-data" class="stacked">
+<form method="post" enctype="multipart/form-data" class="stacked upload-form">
   {% csrf_token %}
-  <label for="crs_file">CRS filing template (.xlsx or .csv)</label>
-  <input type="file" name="crs_file" id="crs_file" accept=".xlsx,.csv" required>
-  <div class="actions-row"><button type="submit" class="btn">Upload and validate</button></div>
+  {% include "portal/_upload_zone.html" with accept=".xlsx,.csv" hint="Excel template (.xlsx) or the same template saved as .csv" %}
+  <div class="actions-row">
+    <button type="submit" class="btn">Submit</button>
+    <a class="btn secondary" href="/portal/filings/">Cancel</a>
+  </div>
 </form>
 
-<div class="panel band" style="margin-top: 24px;">
-  <h2 style="margin-top: 0;">Template columns</h2>
+<details class="spec-details">
+  <summary>Template columns</summary>
   <p class="muted">The first row of the file must be a header row using these column names. Required columns are marked <span class="req-star">*</span>.</p>
   <table class="data">
     <thead><tr><th>Column</th><th>Notes</th></tr></thead>
@@ -37,7 +39,7 @@
       <tr><td class="mono">CPName, CPResidence, CPTIN, CPType</td><td>Optional controlling person, only for AcctHolderType CRS101 rows. CPType is CRS801 to CRS813.</td></tr>
     </tbody>
   </table>
-</div>
+</details>
 
 <div class="back-nav"><a class="btn-back" href="/portal/filings/create/">Back to Create Filing</a></div>
 {% endblock %}

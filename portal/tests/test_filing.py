@@ -21,31 +21,6 @@ pytestmark = pytest.mark.django_db
 YEAR = config.CURRENT_REPORTING_YEAR
 
 
-@pytest.fixture
-def rfi() -> ReportingFI:
-    return ReportingFI.objects.create(
-        reference="NRS-RFI-2025-0001",
-        legal_name="Zenith Trust Bank Plc",
-        tin="0450088801",
-        category="DEPOSITORY_INSTITUTION",
-        enrolment_type="FINANCIAL_ENTITY",
-        status=ReportingFI.Status.ACTIVE,
-        pu_surname="Bello",
-        pu_first_name="Ngozi",
-        pu_designation="Head, Regulatory Reporting",
-        pu_email="pu@zenithtrust.ng",
-        pu_phone="8000000000",
-    )
-
-
-@pytest.fixture
-def partners() -> None:
-    for code, name, since, fingerprint in config.PARTNER_JURISDICTIONS:
-        PartnerJurisdiction.objects.create(
-            code=code, name=name, activated_since=since, key_fingerprint=fingerprint
-        )
-
-
 def make_filing(rfi: ReportingFI, **kwargs) -> Filing:
     defaults = dict(
         reference=f"FIL-{YEAR}-{Filing.objects.count() + 1:05d}",
@@ -162,6 +137,112 @@ class TestValidationRules:
         assert (file_count, record_count) == (0, 0)
 
 
+class TestCorrectionChainValidation:
+    """The correction-chain rules: F-002, R-501, R-502, R-503."""
+
+    def test_duplicate_message_reference_is_error(self, rfi, partners):
+        make_filing(rfi, message_reference="NGCRS-2026-001")
+        filing = make_filing(rfi, message_reference="NGCRS-2026-001", status=Filing.Status.DRAFT)
+        make_record(filing)
+        run_validation(filing)
+        assert filing.findings.filter(code="F-002", severity="ERROR").exists()
+
+    def test_unique_message_reference_passes(self, rfi, partners):
+        make_filing(rfi, message_reference="NGCRS-2026-001")
+        filing = make_filing(rfi, message_reference="NGCRS-2026-002", status=Filing.Status.DRAFT)
+        make_record(filing)
+        run_validation(filing)
+        assert not filing.findings.filter(code="F-002").exists()
+
+    def test_corr_doc_ref_id_must_reference_filed_record(self, rfi, partners):
+        filing = make_filing(rfi, status=Filing.Status.DRAFT)
+        make_record(
+            filing,
+            corr_doc_ref_id="NG2026-UNKNOWN-999",
+            doc_type_indic=AccountReport.DocTypeIndic.OECD2,
+        )
+        run_validation(filing)
+        assert filing.findings.filter(code="R-502", severity="ERROR").exists()
+
+    def test_correction_of_submitted_record_passes(self, rfi, partners):
+        prior = make_filing(rfi)
+        original = make_record(prior)
+        filing = make_filing(rfi, status=Filing.Status.DRAFT)
+        make_record(
+            filing,
+            corr_doc_ref_id=original.doc_ref_id,
+            doc_type_indic=AccountReport.DocTypeIndic.OECD2,
+        )
+        run_validation(filing)
+        assert not filing.findings.filter(code__in=["R-501", "R-502", "R-503"]).exists()
+
+    def test_same_filing_amendment_chain_passes(self, rfi, partners):
+        # The returned-for-correction flow supersedes the original within the
+        # same filing; its CorrDocRefId must not be flagged as dangling.
+        filing = make_filing(rfi, status=Filing.Status.RETURNED)
+        original = make_record(filing, superseded=True)
+        make_record(
+            filing,
+            corr_doc_ref_id=original.doc_ref_id,
+            doc_type_indic=AccountReport.DocTypeIndic.OECD2,
+        )
+        run_validation(filing)
+        assert not filing.findings.filter(code__in=["R-501", "R-502", "R-503"]).exists()
+
+    def test_same_record_corrected_twice_in_one_filing_is_error(self, rfi, partners):
+        prior = make_filing(rfi)
+        original = make_record(prior)
+        filing = make_filing(rfi, status=Filing.Status.DRAFT)
+        make_record(
+            filing,
+            corr_doc_ref_id=original.doc_ref_id,
+            doc_type_indic=AccountReport.DocTypeIndic.OECD2,
+        )
+        make_record(
+            filing,
+            corr_doc_ref_id=original.doc_ref_id,
+            doc_type_indic=AccountReport.DocTypeIndic.OECD2,
+        )
+        run_validation(filing)
+        assert filing.findings.filter(code="R-501", severity="ERROR").count() == 1
+
+    def test_correcting_an_already_corrected_record_is_error(self, rfi, partners):
+        prior = make_filing(rfi)
+        original = make_record(prior)
+        earlier_correction = make_filing(rfi)
+        make_record(
+            earlier_correction,
+            corr_doc_ref_id=original.doc_ref_id,
+            doc_type_indic=AccountReport.DocTypeIndic.OECD2,
+        )
+        filing = make_filing(rfi, status=Filing.Status.DRAFT)
+        make_record(
+            filing,
+            corr_doc_ref_id=original.doc_ref_id,
+            doc_type_indic=AccountReport.DocTypeIndic.OECD2,
+        )
+        run_validation(filing)
+        assert filing.findings.filter(code="R-503", severity="ERROR").exists()
+
+    def test_draft_correction_elsewhere_does_not_block(self, rfi, partners):
+        prior = make_filing(rfi)
+        original = make_record(prior)
+        draft_elsewhere = make_filing(rfi, status=Filing.Status.DRAFT)
+        make_record(
+            draft_elsewhere,
+            corr_doc_ref_id=original.doc_ref_id,
+            doc_type_indic=AccountReport.DocTypeIndic.OECD2,
+        )
+        filing = make_filing(rfi, status=Filing.Status.DRAFT)
+        make_record(
+            filing,
+            corr_doc_ref_id=original.doc_ref_id,
+            doc_type_indic=AccountReport.DocTypeIndic.OECD2,
+        )
+        run_validation(filing)
+        assert not filing.findings.filter(code="R-503").exists()
+
+
 class TestCorrectionLineage:
     def test_corr_doc_ref_id_resolves_to_original(self, rfi, partners):
         filing = make_filing(rfi, status=Filing.Status.RETURNED)
@@ -225,26 +306,6 @@ class TestXmlIngestion:
         assert not result.ok
 
 
-@pytest.fixture
-def portal_client(rfi) -> Client:
-    email = "pu@zenithtrust.ng"
-    user = get_user_model().objects.create_user(username=email, password="Secret123!")
-    PortalUser.objects.create(
-        user=user,
-        rfi=rfi,
-        display_name="Ngozi Bello",
-        designation="Head, Regulatory Reporting",
-        role=PortalUser.Role.CHECKER,
-        status=PortalUser.Status.ACTIVE,
-        is_primary_user=True,
-        must_change_password=False,
-    )
-    client = Client()
-    response = client.post("/portal/login/", {"email": email, "password": "Secret123!"})
-    assert response.status_code == 302
-    return client
-
-
 class TestReturnedFilingEditing:
     """A filing the NRS returned ("rejected") must be editable and resubmittable."""
 
@@ -293,7 +354,9 @@ class TestReturnedFilingEditing:
         response = portal_client.post(f"/portal/filings/{filing.pk}/resubmit/")
         assert response.status_code == 302
         filing.refresh_from_db()
-        assert filing.status == Filing.Status.SUBMITTED
+        # Resubmission auto-validates against the CRS schema on arrival.
+        assert filing.status == Filing.Status.UNDER_VALIDATION
+        assert filing.validated_at is not None
 
     def test_resubmit_blocked_while_flagged_record_uncorrected(self, rfi, partners, portal_client):
         filing = make_filing(rfi, status=Filing.Status.RETURNED, return_reason="Bad TIN.")
@@ -324,7 +387,9 @@ class TestReturnedFilingEditing:
         response = portal_client.post(f"/portal/filings/{filing.pk}/resubmit/")
         assert response.status_code == 302
         filing.refresh_from_db()
-        assert filing.status == Filing.Status.SUBMITTED
+        # Resubmission auto-validates against the CRS schema on arrival.
+        assert filing.status == Filing.Status.UNDER_VALIDATION
+        assert filing.validated_at is not None
 
 
 class TestOecdXmlSamples:

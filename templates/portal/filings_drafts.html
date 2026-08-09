@@ -18,11 +18,12 @@
   <thead><tr>
     <th>Filing Name</th><th>Reference</th><th>Revision</th><th>Category</th>
     <th>Receiving Country</th><th>Status</th><th>Filing Date</th><th>Due Date</th>
+    <th style="width:90px">Action</th>
   </tr></thead>
   <tbody>
     {% for filing in filings %}
     <tr>
-      <td><a href="/portal/filings/{{ filing.pk }}/crs/">{{ filing.name|default:filing.get_kind_display }}</a></td>
+      <td><a href="/portal/filings/{{ filing.pk }}/view/">{{ filing.name|default:filing.get_kind_display }}</a></td>
       <td class="mono">{{ filing.reference }}</td>
       <td class="num">{{ filing.revision }}</td>
       <td><span class="tag-cat">{{ filing.category_label }}</span></td>
@@ -30,9 +31,19 @@
       <td><span class="tag-data {% if filing.data_status == 'No Data' %}nodata{% endif %}">{{ filing.data_status }}</span></td>
       <td>{{ filing.created_at|date:"Y-m-d" }}</td>
       <td>{% if deadline_date %}{{ deadline_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
+      <td>
+        {% if filing.is_deletable %}
+        <form method="post" action="/portal/filings/{{ filing.pk }}/delete/" class="row-delete"
+              onsubmit="return confirm('Delete {{ filing.reference }}? The filing and all of its data will be permanently lost.');">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="/portal/filings/drafts/">
+          <button type="submit" class="btn ghost sm danger">Delete</button>
+        </form>
+        {% endif %}
+      </td>
     </tr>
     {% empty %}
-    <tr><td colspan="8" class="muted">No draft filings. Start one under Submissions.</td></tr>
+    <tr><td colspan="9" class="muted">No draft filings. Start one under Submissions.</td></tr>
     {% endfor %}
   </tbody>
 </table>

@@ -43,12 +43,14 @@ def submit_enrolment(client: Client | None = None) -> ReportingFI:
             "pu_middle_name": "Chidinma",
             "pu_first_name": "Ngozi",
             "pu_dob": "1985-06-15",
+            "pu_place_of_birth": "Enugu, Enugu State, Nigeria",
             "pu_designation": "Head, Regulatory Reporting",
             "pu_email": "ngozi.bello@zenithtrust.ng",
             "pu_phone_cc": "+234",
             "pu_phone": "8012345678",
             "id_document": identity,
             "ceo_letter": letter,
+            "confirm_accuracy": "yes",
         },
     )
     assert response.status_code == 200
@@ -82,14 +84,36 @@ class TestEnrolmentStateMachine:
                 "enrolment_type": "INDIVIDUAL", "email": "a@b.ng", "email_confirm": "a@b.ng",
                 "phone_cc": "+234", "phone": "8010000000", "street": "1 A St", "city": "Lagos",
                 "state_province": "Lagos", "post_code": "100001", "pu_surname": "Doe",
-                "pu_first_name": "Jane", "pu_designation": "Self", "pu_email": "jane@b.ng",
+                "pu_first_name": "Jane", "pu_place_of_birth": "Ibadan, Oyo State, Nigeria",
+                "pu_designation": "Self", "pu_email": "jane@b.ng",
                 "pu_phone_cc": "+234", "pu_phone": "8010000001",
                 "id_document": identity, "ceo_letter": letter,
+                "confirm_accuracy": "yes",
             },
         )
         assert response.status_code == 200
         assert "Date of birth is required." in response.content.decode()
         assert not ReportingFI.objects.filter(tin="0450088899").exists()
+
+    def test_accuracy_confirmation_is_required(self):
+        letter = SimpleUploadedFile("ceo_letter.pdf", b"%PDF-1.4 demo", content_type="application/pdf")
+        identity = SimpleUploadedFile("pu_id.pdf", b"%PDF-1.4 demo", content_type="application/pdf")
+        response = Client().post(
+            "/portal/enrol/",
+            {
+                "legal_name": "Unconfirmed Bank", "tin": "0450088877", "category": "DEPOSITORY_INSTITUTION",
+                "enrolment_type": "FINANCIAL_ENTITY", "email": "c@d.ng", "email_confirm": "c@d.ng",
+                "phone_cc": "+234", "phone": "8010000002", "street": "1 A St", "city": "Lagos",
+                "state_province": "Lagos", "post_code": "100001", "pu_surname": "Doe",
+                "pu_first_name": "John", "pu_dob": "1980-01-01", "pu_place_of_birth": "Kano, Kano State, Nigeria", "pu_designation": "Head",
+                "pu_email": "john@d.ng", "pu_phone_cc": "+234", "pu_phone": "8010000003",
+                "id_document": identity, "ceo_letter": letter,
+                # confirm_accuracy deliberately omitted: the box was not ticked.
+            },
+        )
+        assert response.status_code == 200
+        assert "accurate and complete" in response.content.decode()
+        assert not ReportingFI.objects.filter(tin="0450088877").exists()
 
     def test_assessment_step_is_retired(self):
         # The recorded-assessment route is not part of the Vizor enrolment

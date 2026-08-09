@@ -148,10 +148,10 @@ class IssuedCredential(RoleListMixin, models.Model):
     or the Super Admin's live-session sweep retires it; EXPIRED if never used
     within the issuance validity window; REVOKED by the Super Admin.
 
-    Within its validity the credential admits repeated daily sign-ins during
-    working hours (core.workhours), but only one live session at a time:
-    signing out unbinds the session and leaves the credential ACTIVE for the
-    next working day. It carries a snapshot of the user's roles.
+    Within its validity the credential admits repeated sign-ins at any time,
+    but only one live session at a time: signing out unbinds the session and
+    leaves the credential ACTIVE for the next sign-in. It carries a snapshot
+    of the user's roles.
     """
 
     class Status(models.TextChoices):
@@ -244,8 +244,8 @@ class IssuedCredential(RoleListMixin, models.Model):
     def unbind(self, reason: str) -> None:
         """End the current live session without ending the validity window.
 
-        The credential stays ACTIVE and admits a fresh sign-in the next
-        working day (or later the same day).
+        The credential stays ACTIVE and admits a fresh sign-in at any time
+        within its validity window.
         """
         self.bound_session_key = ""
         self.save(update_fields=["bound_session_key"])

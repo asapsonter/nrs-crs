@@ -206,6 +206,10 @@ def _address_block(
     *,
     street: str = "",
     building: str = "",
+    suite: str = "",
+    floor: str = "",
+    district: str = "",
+    pob: str = "",
     post_code: str = "",
     city: str = "",
     country_subentity: str = "",
@@ -227,6 +231,14 @@ def _address_block(
             add(f"{indent}    <cfc:Street>{escape(street)}</cfc:Street>")
         if building.strip():
             add(f"{indent}    <cfc:BuildingIdentifier>{escape(building)}</cfc:BuildingIdentifier>")
+        if suite.strip():
+            add(f"{indent}    <cfc:SuiteIdentifier>{escape(suite)}</cfc:SuiteIdentifier>")
+        if floor.strip():
+            add(f"{indent}    <cfc:FloorIdentifier>{escape(floor)}</cfc:FloorIdentifier>")
+        if district.strip():
+            add(f"{indent}    <cfc:DistrictName>{escape(district)}</cfc:DistrictName>")
+        if pob.strip():
+            add(f"{indent}    <cfc:POB>{escape(pob)}</cfc:POB>")
         if post_code.strip():
             add(f"{indent}    <cfc:PostCode>{escape(post_code)}</cfc:PostCode>")
         add(f"{indent}    <cfc:City>{escape(city)}</cfc:City>")
@@ -238,15 +250,18 @@ def _address_block(
     add(f"{indent}</crs:Address>")
 
 
-def _name_block(indent: str, first_name: str, last_name: str, lines: list) -> None:
+def _name_block(indent: str, first_name: str, last_name: str, lines: list, middle_name: str = "") -> None:
     """Emit a CRS NamePerson_Type.
 
     FirstName and LastName are both Validation elements (User Guide IIc), so
     both are always written; `crs_name_parts` guarantees non-empty values.
+    MiddleName is Optional and sits between them in the schema sequence.
     """
     add = lines.append
     add(f"{indent}<crs:Name>")
     add(f"{indent}  <crs:FirstName>{escape(first_name)}</crs:FirstName>")
+    if middle_name.strip():
+        add(f"{indent}  <crs:MiddleName>{escape(middle_name)}</crs:MiddleName>")
     add(f"{indent}  <crs:LastName>{escape(last_name)}</crs:LastName>")
     add(f"{indent}</crs:Name>")
 
@@ -424,10 +439,12 @@ def generate_crs_xml(package) -> str:
                 add(f"            <crs:ResCountryCode>{record.residence_country}</crs:ResCountryCode>")
                 if record.foreign_tin:
                     add(f'            <crs:TIN issuedBy="{record.residence_country}">{escape(record.foreign_tin)}</crs:TIN>')
-                _name_block("            ", first_name, last_name, lines)
+                _name_block("            ", first_name, last_name, lines, record.holder_middle_name)
                 _address_block(
                     "            ", record.address_country_code, record.holder_address, lines,
                     street=record.holder_street, building=record.holder_building_identifier,
+                    suite=record.holder_suite_identifier, floor=record.holder_floor_identifier,
+                    district=record.holder_district_name, pob=record.holder_pob,
                     post_code=record.holder_post_code, city=record.holder_city,
                     country_subentity=record.holder_country_subentity,
                 )
@@ -447,6 +464,8 @@ def generate_crs_xml(package) -> str:
                 _address_block(
                     "            ", record.address_country_code, record.holder_address, lines,
                     street=record.holder_street, building=record.holder_building_identifier,
+                    suite=record.holder_suite_identifier, floor=record.holder_floor_identifier,
+                    district=record.holder_district_name, pob=record.holder_pob,
                     post_code=record.holder_post_code, city=record.holder_city,
                     country_subentity=record.holder_country_subentity,
                 )
@@ -465,7 +484,7 @@ def generate_crs_xml(package) -> str:
                 add(f"            <crs:ResCountryCode>{cp.residence_country}</crs:ResCountryCode>")
                 if cp.tin:
                     add(f'            <crs:TIN issuedBy="{cp.residence_country}">{escape(cp.tin)}</crs:TIN>')
-                _name_block("            ", cp_first, cp_last, lines)
+                _name_block("            ", cp_first, cp_last, lines, cp.middle_name)
                 _address_block(
                     "            ", cp.address_country_code, cp.address, lines, city=cp.city,
                 )
@@ -491,3 +510,61 @@ def generate_crs_xml(package) -> str:
         add("  </crs:CrsBody>")
     add("</crs:CRS_OECD>")
     return "\n".join(lines)
+
+
+def expiring_certificates(within_days: int | None = None):
+    """CTS certificates at or past their warning window: expiring soon or
+    already expired. Feeds the certificate-expiry alert (FR-CTS-010)."""
+    from exchange.models import TransmissionCertificate
+
+    within = within_days if within_days is not None else config.CERTIFICATE_EXPIRY_WARNING_DAYS
+    cutoff = timezone.localdate() + datetime.timedelta(days=within)
+    return (
+        TransmissionCertificate.objects.filter(revoked=False, valid_to__lte=cutoff)
+        .select_related("jurisdiction")
+        .order_by("valid_to")
+    )
+
+
+def cts_exceptions() -> dict:
+    """Aggregate the open CTS exceptions for the monitoring/exception report:
+    failed transmissions, pending corrections, unresolved status messages,
+    rejected inbound files, and expiring certificates (RR-CTS-003)."""
+    from exchange.models import ExchangePackage, InboundFile, RecordError
+
+    return {
+        "failed_transmissions": ExchangePackage.objects.filter(
+            status=ExchangePackage.Status.FILE_ERROR
+        ).select_related("jurisdiction"),
+        "pending_corrections": ExchangePackage.objects.filter(
+            status=ExchangePackage.Status.RECORD_ERRORS
+        ).select_related("jurisdiction"),
+        "unresolved_record_errors": RecordError.objects.filter(
+            resolved=False
+        ).select_related("status_message__package__jurisdiction"),
+        "rejected_inbound": InboundFile.objects.filter(
+            status=InboundFile.Status.FILE_ERROR
+        ).select_related("jurisdiction"),
+        "expiring_certificates": expiring_certificates(),
+    }
+
+
+def filing_to_xml(filing) -> str:
+    """Render one filing as a standalone CRS_OECD v2.0 document.
+
+    Used by the Supervision Centre to download a submitted filing — whether
+    it arrived as an XML upload, Excel upload, or manual entry — in the
+    canonical exchange format. Nothing is persisted; the document is built
+    from the filing's live records through the same emitter that produces
+    exchange packages.
+    """
+    from types import SimpleNamespace
+
+    shim = SimpleNamespace(
+        message_type=filing.message_type,
+        records=filing.account_reports.filter(superseded=False),
+        jurisdiction=SimpleNamespace(code=(filing.receiving_country or "").strip() or "NG"),
+        message_ref_id=filing.message_reference or filing.reference,
+        reporting_year=filing.reporting_year,
+    )
+    return generate_crs_xml(shim)

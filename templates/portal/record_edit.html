@@ -171,12 +171,12 @@
         <input type="text" name="cp_surname" id="cp_surname" required>
       </div>
       <div class="field">
-        <label for="cp_middle_name">Middle name</label>
-        <input type="text" name="cp_middle_name" id="cp_middle_name">
+        <label for="cp_other_names">Firstname</label>
+        <input type="text" name="cp_other_names" id="cp_other_names" required>
       </div>
       <div class="field">
-        <label for="cp_other_names">Other names</label>
-        <input type="text" name="cp_other_names" id="cp_other_names" required>
+        <label for="cp_middle_name">Others</label>
+        <input type="text" name="cp_middle_name" id="cp_middle_name">
       </div>
     </div>
     <label for="cp_residence">Residence jurisdiction</label>
@@ -194,6 +194,10 @@
     <input type="text" name="cp_city" id="cp_city">
     <label for="cp_dob">Date of birth</label>
     <input type="date" name="cp_dob" id="cp_dob">
+    <label for="cp_birth_city">Place of birth (city)</label>
+    <input type="text" name="cp_birth_city" id="cp_birth_city">
+    <label for="cp_birth_country">Country of birth (2-letter code)</label>
+    <input type="text" name="cp_birth_country" id="cp_birth_country" maxlength="2" placeholder="e.g. NG">
     <label for="cp_type">Controlling person type</label>
     <select name="cp_type" id="cp_type">
       {% for code, label in ctrlg_person_types %}

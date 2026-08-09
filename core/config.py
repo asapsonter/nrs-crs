@@ -350,13 +350,12 @@ CURRENCIES: list[tuple[str, str]] = [
 RISK_ENHANCED_THRESHOLD: Decimal = Decimal("100000")
 RISK_SPECIFIC_THRESHOLD: Decimal = Decimal("50000")
 
+# A CTS certificate within this many days of expiry raises a monitoring alert
+# so it is renewed before it lapses (OR-CTS-006, FR-CTS-010).
+CERTIFICATE_EXPIRY_WARNING_DAYS: int = 30
+
 # Portal account lockout threshold.
 PORTAL_MAX_FAILED_LOGINS: int = 5
-
-# Supervision Centre working hours (local time, Africa/Lagos). Credential
-# access is available from the start hour up to (not including) the end hour.
-WORK_DAY_START_HOUR: int = 8
-WORK_DAY_END_HOUR: int = 18
 
 # Longest credential validity the Super Admin may grant, in months.
 CREDENTIAL_MAX_MONTHS: int = 12

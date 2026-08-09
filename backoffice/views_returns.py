@@ -1,11 +1,14 @@
-"""Returns workspace: validation by processing users, approval by Internal Admin.
+"""Returns workspace: automatic schema validation at submission, approval here.
 
-Four-eyes on the same filing: whoever validated cannot be the person who
-approves it for exchange.
+Filings are validated against the CRS schema standard the moment an
+institution submits them (see portal.services.auto_validate_submission), so
+the workspace begins at the approval stage. Officers may rerun the checks;
+four-eyes still applies: whoever (re)validated cannot also approve.
 """
 from __future__ import annotations
 
 from django.contrib import messages
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -19,8 +22,11 @@ from portal.models import Filing, ValidationFinding
 @require_cap(access.VIEW_RETURNS)
 def queue(request):
     """Filings by processing stage, including the nil return register."""
-    awaiting_validation = Filing.objects.filter(status=Filing.Status.SUBMITTED).select_related("rfi")
-    under_validation = Filing.objects.filter(status=Filing.Status.UNDER_VALIDATION).select_related("rfi")
+    # SUBMITTED is included as a safety net: filings predating automatic
+    # validation surface here instead of vanishing from every queue.
+    awaiting_approval = Filing.objects.filter(
+        status__in=[Filing.Status.SUBMITTED, Filing.Status.UNDER_VALIDATION]
+    ).select_related("rfi")
     returned = Filing.objects.filter(status=Filing.Status.RETURNED).select_related("rfi")
     accepted = Filing.objects.filter(
         status__in=[Filing.Status.ACCEPTED, Filing.Status.IN_EXCHANGE]
@@ -30,8 +36,7 @@ def queue(request):
         request,
         "backoffice/returns_queue.html",
         {
-            "awaiting_validation": awaiting_validation,
-            "under_validation": under_validation,
+            "awaiting_approval": awaiting_approval,
             "returned": returned,
             "accepted": accepted,
             "nil_returns": nil_returns,
@@ -68,6 +73,19 @@ def detail(request, filing_id: int):
         and not four_eyes_blocked
     )
     can_override = access.APPROVE_RETURNS in caps and filing.status == Filing.Status.UNDER_VALIDATION
+    # An administrative notice is reviewed on its form payload.
+    notice_fields = []
+    if filing.is_notice:
+        optional_labels = {
+            "new_pu_middle_name": "New Primary User middle name",
+            "reason": "Reason",
+            "state_province": "State or province",
+            "post_code": "Post code",
+        }
+        for key, label in Filing.NOTICE_REQUIRED_FIELDS[filing.kind]:
+            notice_fields.append((label, filing.notice_payload.get(key, "")))
+        for key in Filing.NOTICE_OPTIONAL_FIELDS[filing.kind]:
+            notice_fields.append((optional_labels.get(key, key), filing.notice_payload.get(key, "")))
     return render(
         request,
         "backoffice/returns_detail.html",
@@ -88,9 +106,29 @@ def detail(request, filing_id: int):
             "can_override": can_override,
             "four_eyes_blocked": four_eyes_blocked,
             "validated": validated,
+            "notice_fields": notice_fields,
             "nav": "returns",
         },
     )
+
+
+@require_cap(access.VIEW_RETURNS)
+def download(request, filing_id: int):
+    """Download a submitted filing as a CRS_OECD v2.0 XML document.
+
+    Works for every CRS data filing regardless of how it arrived — XML
+    upload, Excel upload, or manual entry — by rendering the filing's live
+    records through the exchange emitter. Nothing is stored.
+    """
+    from exchange.services import filing_to_xml
+
+    filing = get_object_or_404(Filing, pk=filing_id)
+    if filing.is_notice:
+        messages.error(request, "An administrative notice has no CRS document to download.")
+        return redirect(f"/backoffice/returns/{filing.pk}/")
+    response = HttpResponse(filing_to_xml(filing), content_type="application/xml")
+    response["Content-Disposition"] = f'attachment; filename="{filing.reference}.xml"'
+    return response
 
 
 @require_cap(access.ACT_RETURNS)
@@ -203,6 +241,25 @@ def approve(request, filing_id: int):
     filing.accepted_at = timezone.now()
     filing.approved_by = officer
     filing.save()
+    if filing.is_notice:
+        # Approval of an administrative notice applies the change it
+        # requests: a new Primary User, a deactivated entity, or updated
+        # entity information.
+        from portal.services import apply_notice
+
+        applied = apply_notice(filing)
+        AuditLog.record(
+            actor_name=officer.name,
+            actor_role=request.credential.role_display,
+            credential=request.credential,
+            action="NOTICE_APPROVED",
+            target=filing.reference,
+            before_state=before,
+            after_state=filing.status,
+            detail=applied,
+        )
+        messages.success(request, f"{filing.reference} approved. {applied}")
+        return redirect("/backoffice/returns/")
     AuditLog.record(
         actor_name=officer.name,
         actor_role=request.credential.role_display,

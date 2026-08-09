@@ -23,7 +23,7 @@
       <td class="mono">{{ filing.reference }}</td>
       <td>{{ filing.get_kind_display }}{% if filing.is_crs_data %} ({{ filing.message_type }}){% endif %}</td>
       <td class="num">{{ filing.record_count }}</td>
-      <td>{% pill filing.status filing.get_status_display %}</td>
+      <td>{% pill filing.status filing.fi_status_display %}</td>
       <td>{{ filing.submitted_at|date:"Y-m-d"|default:"-" }}</td>
       <td><a href="/portal/filings/{{ filing.pk }}/">Open</a></td>
     </tr>

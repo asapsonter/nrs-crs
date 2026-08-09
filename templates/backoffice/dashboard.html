@@ -20,4 +20,12 @@
   {% endif %}
   {% endfor %}
 </div>
+
+{% if show_reports %}
+<div class="dash-reports">
+  <h2 style="margin-top: 32px;">Reports &amp; Insights</h2>
+  <p class="page-sub">Reporting year {{ year }}. Read-only analytical views across the AEOI-CRS workflow.</p>
+  {% include "backoffice/_reports_insights.html" %}
+</div>
+{% endif %}
 {% endblock %}

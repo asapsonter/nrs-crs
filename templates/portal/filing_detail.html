@@ -6,7 +6,7 @@
 <h1>{{ filing.name|default:filing.reference }}</h1>
 <p class="page-sub">
   {{ filing.reference }} &middot; {{ filing.get_kind_display }}{% if filing.is_crs_data %} ({{ filing.message_type }}){% endif %} for {{ filing.rfi.legal_name }} &middot;
-  {% pill filing.status filing.get_status_display %}
+  {% pill filing.status filing.fi_status_display %}
 </p>
 
 <div class="filing-meta">

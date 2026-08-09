@@ -1,0 +1,139 @@
+{% extends "portal/base.html" %}
+{% block title %}{% if was_sent %}Return filed{% else %}Validation report{% endif %} · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+
+{% if was_sent %}
+{% comment %}
+The filed-successfully screen: one clear confirmation, nothing else.
+Warnings and processing detail belong to the Supervision Centre.
+{% endcomment %}
+<div class="success-screen">
+  <div class="success-card">
+    <span class="success-check" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+    </span>
+    <h1 class="success-title">
+      {{ filed_by.display_name }} ({{ filed_by.get_role_display }}), your
+      {{ return_label }} was successfully filed.
+    </h1>
+    <p class="success-body">
+      Sent to the Supervision Centre under reference
+      &ldquo;<span class="success-ref">{{ filing.reference }}</span>&rdquo;.
+    </p>
+
+    <dl class="success-meta">
+      <div><dt>Filing type</dt><dd>{{ filing.get_kind_display }}</dd></div>
+      <div><dt>Account reports</dt><dd>{{ record_count }}</dd></div>
+      <div><dt>Reporting year</dt><dd>{{ filing.reporting_year }}</dd></div>
+      <div><dt>Status</dt><dd>{{ filing.fi_status_display }}</dd></div>
+    </dl>
+
+    <div class="success-actions">
+      <a class="btn" href="/portal/submit/">Go to Submissions</a>
+      <a class="btn secondary" href="/portal/filings/{{ filing.pk }}/">Open filing</a>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<h1>Validation report</h1>
+<p class="page-sub">
+  {{ filing.name|default:filing.get_kind_display }} &middot;
+  <span class="mono">{{ filing.reference }}</span> &middot;
+  {{ record_count }} account report{{ record_count|pluralize }} &middot;
+  Reporting year {{ filing.reporting_year }}
+</p>
+
+<div class="vr-outcome bad">
+  <span class="vr-mark" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5"/><path d="M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg>
+  </span>
+  <div>
+    <h2>Not sent &mdash; {{ errors|length }} error{{ errors|length|pluralize }} must be resolved</h2>
+    <p>
+      <strong>{{ filed_by.display_name }}</strong> ({{ filed_by.get_role_display }}), this file did
+      not pass the validation rules and has been flagged:
+      <strong>{{ file_errors|length }}</strong> filing-level error{{ file_errors|length|pluralize }} and
+      <strong>{{ record_errors|length }}</strong> record error{{ record_errors|length|pluralize }}
+      across {{ record_count }} account report{{ record_count|pluralize }}.
+    </p>
+    <p>
+      This filing has been kept as a <strong>draft</strong> with its findings attached. Correct the
+      records below &mdash; or fix the source file and upload it again &mdash; then submit.
+      Nothing has been sent to the Supervision Centre.
+    </p>
+  </div>
+</div>
+
+{% if file_errors %}
+  <section class="vr-block">
+    <h3 class="vr-title">Filing-level errors</h3>
+    <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr>
+          <th style="width:90px">Code</th>
+          <th style="width:44%">What caused the error</th>
+          <th>How to resolve it</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for finding in file_errors %}
+          <tr>
+            <td class="mono">{{ finding.code }}</td>
+            <td>{{ finding.message }}</td>
+            <td>{{ finding.resolution }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </section>
+{% endif %}
+
+{% if record_errors %}
+  <section class="vr-block">
+    <h3 class="vr-title">Record errors</h3>
+    <p class="muted">Each row must be corrected before this filing can be submitted.</p>
+    <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr>
+          <th style="width:90px">Code</th>
+          {% if show_lines %}<th style="width:80px">XML line</th>{% endif %}
+          <th style="width:16%">Account holder</th>
+          <th style="width:13%">Account number</th>
+          <th style="width:28%">What caused the error</th>
+          <th>How to resolve it</th>
+          <th style="width:70px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for finding in record_errors %}
+          <tr>
+            <td class="mono">{{ finding.code }}</td>
+            {% if show_lines %}<td class="mono">{{ finding.account_report.source_line|default:"&mdash;" }}</td>{% endif %}
+            <td>{{ finding.account_report.holder_name|default:"&mdash;" }}</td>
+            <td class="mono">{{ finding.account_report.account_number|default:"&mdash;" }}</td>
+            <td>{{ finding.message }}</td>
+            <td>{{ finding.resolution }}</td>
+            <td>
+              <a class="btn ghost sm"
+                 href="/portal/filings/{{ filing.pk }}/records/{{ finding.account_report_id }}/">Fix</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </section>
+{% endif %}
+
+<div class="vr-actions">
+  <a class="btn" href="/portal/filings/{{ filing.pk }}/">Open filing</a>
+  <a class="btn secondary" href="/portal/filings/upload/">Upload a corrected file</a>
+  <a class="btn ghost" href="/portal/filings/drafts/">Go to Draft Filings</a>
+</div>
+{% endif %}
+
+{% endblock %}

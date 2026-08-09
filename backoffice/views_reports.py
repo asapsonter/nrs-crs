@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from django.db.models import Count
-from django.shortcuts import render
+from django.shortcuts import redirect
 
 from core import access, config
 from core.decorators import require_cap
@@ -30,8 +30,8 @@ def _bar_chart(rows: list[tuple[str, int]], width: int = 720) -> dict:
     }
 
 
-@require_cap(access.VIEW_REPORTS)
-def reports(request):
+def reports_context() -> dict:
+    """The Reports & Insights figures, rendered on the dashboard."""
     year = config.CURRENT_REPORTING_YEAR
 
     funnel_order = [
@@ -90,19 +90,20 @@ def reports(request):
         "archived": packages.filter(status=ExchangePackage.Status.ARCHIVED).count(),
     }
 
-    return render(
-        request,
-        "backoffice/reports.html",
-        {
-            "year": year,
-            "funnel": funnel,
-            "funnel_chart": _bar_chart(funnel),
-            "outgoing": outgoing,
-            "outgoing_chart": _bar_chart([(code, total) for code, total in outgoing]),
-            "incoming": incoming,
-            "correction_rates": correction_rates,
-            "enrolment_rows": enrolment_rows,
-            "timeliness": timeliness,
-            "nav": "reports",
-        },
-    )
+    return {
+        "year": year,
+        "funnel": funnel,
+        "funnel_chart": _bar_chart(funnel),
+        "outgoing": outgoing,
+        "outgoing_chart": _bar_chart([(code, total) for code, total in outgoing]),
+        "incoming": incoming,
+        "correction_rates": correction_rates,
+        "enrolment_rows": enrolment_rows,
+        "timeliness": timeliness,
+    }
+
+
+@require_cap(access.VIEW_REPORTS)
+def reports(request):
+    """Reports & Insights now live on the dashboard; the old URL follows."""
+    return redirect("/backoffice/")

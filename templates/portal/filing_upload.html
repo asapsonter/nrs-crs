@@ -3,27 +3,49 @@
 {% block content %}
 {% include "portal/deadline_banner.html" %}
 <h1>Upload CRS XML</h1>
-<p class="page-sub">Upload an official CRS XML Schema v2.0 document (CRS_OECD, as circulated in the FI sensitization pack) or the NRS simplified filing form &mdash; the format is detected automatically. Malformed files are rejected with per-record messages, and the message header from a CRS_OECD document is carried onto the filing.</p>
+<p class="page-sub">Attach your CRS XML file and submit.</p>
 
 {% if errors %}
 <div class="error-text">
-  <strong>The file was rejected.</strong><br>
-  {% for error in errors %}{{ error }}<br>{% endfor %}
+  <strong>{{ request.portal_profile.display_name }}</strong>
+  ({{ request.portal_profile.get_role_display }}), this file did not pass the validation rules
+  and has been flagged. <strong>The file was rejected with
+  {{ errors|length }} error{{ errors|length|pluralize }}.</strong>
+  Nothing has been filed. Correct each item below in your source file and upload it again.
+</div>
+<div class="table-wrap" style="margin-bottom: var(--s3);">
+<table class="data">
+  <thead>
+    <tr>
+      <th style="width:90px">XML line</th>
+      <th style="width:44%">What caused the error</th>
+      <th>How to resolve it</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in error_rows %}
+    <tr>
+      <td class="mono">{% if row.line %}{{ row.line }}{% else %}&mdash;{% endif %}</td>
+      <td>{{ row.cause }}</td>
+      <td>{{ row.hint }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 </div>
 {% endif %}
 
-<form method="post" enctype="multipart/form-data" class="stacked">
+<form method="post" enctype="multipart/form-data" class="stacked upload-form">
   {% csrf_token %}
-  <label for="crs_file">CRS filing document (XML)</label>
-  <input type="file" name="crs_file" id="crs_file" accept=".xml,text/xml" required>
+  {% include "portal/_upload_zone.html" with accept=".xml,text/xml" hint="CRS XML document (.xml)" %}
   <div class="actions-row">
-    <button type="submit" class="btn">Validate and stage</button>
+    <button type="submit" class="btn">Submit</button>
     <a class="btn secondary" href="/portal/filings/">Cancel</a>
   </div>
 </form>
 
-<div class="panel band mt">
-  <h2 style="margin-top: 0;">Expected structure</h2>
+<details class="spec-details">
+  <summary>Expected structure of the simplified filing form</summary>
 <pre class="mono" style="font-size: 12px; line-height: 1.5;">&lt;CRSFiling year="{{ REPORTING_YEAR }}"&gt;
   &lt;ReportingFI tin="0450088801" name="Institution Legal Name"/&gt;
   &lt;AccountReport&gt;
@@ -36,5 +58,5 @@
     &lt;Interest&gt;120000.00&lt;/Interest&gt;
   &lt;/AccountReport&gt;
 &lt;/CRSFiling&gt;</pre>
-</div>
+</details>
 {% endblock %}

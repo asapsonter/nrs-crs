@@ -26,6 +26,7 @@ from exchange.models import (
     RecordError,
     StatusMessage,
     Taxpayer,
+    TransmissionCertificate,
 )
 from exchange.services import generate_crs_xml, next_message_ref_id
 from portal.models import AccountReport, Filing, PortalUser, ReportingFI, ValidationFinding
@@ -45,6 +46,7 @@ class Command(BaseCommand):
         self.stdout.write("Seeding partners, institutions, filings, and exchange state.")
         self._seed_superadmin()
         self._seed_partners()
+        self._seed_certificates()
         rfis = self._seed_rfis()
         self._seed_status_events()
         self._seed_filings(rfis)
@@ -74,6 +76,7 @@ class Command(BaseCommand):
             InboundRecord,
             InboundFile,
             Taxpayer,
+            TransmissionCertificate,
             ExchangePackage,
             ValidationFinding,
             AccountReport,
@@ -103,6 +106,35 @@ class Command(BaseCommand):
                 name=name,
                 activated_since=datetime.date.fromisoformat(since),
                 key_fingerprint=fingerprint,
+            )
+
+    def _seed_certificates(self) -> None:
+        """Seed the CTS certificate inventory: the NRS signing certificate and
+        one public-key certificate per activated partner. A couple are set
+        near or past expiry so the monitoring alert has something to show."""
+        today = timezone.localdate()
+        TransmissionCertificate.objects.create(
+            owner=TransmissionCertificate.Owner.NRS,
+            jurisdiction=None,
+            subject="NRS AEOI CTS signing certificate",
+            fingerprint="NG:5A:2C:81:44:E0:8C:71:2D:5A:B9:03:F4:66:1E:C8",
+            valid_from=today - datetime.timedelta(days=400),
+            valid_to=today + datetime.timedelta(days=210),
+        )
+        for index, partner in enumerate(PartnerJurisdiction.objects.all()):
+            if index == 0:
+                valid_to = today - datetime.timedelta(days=6)     # expired
+            elif index == 1:
+                valid_to = today + datetime.timedelta(days=18)    # expiring soon
+            else:
+                valid_to = today + datetime.timedelta(days=180 + (index % 10) * 20)
+            TransmissionCertificate.objects.create(
+                owner=TransmissionCertificate.Owner.PARTNER,
+                jurisdiction=partner,
+                subject=f"{partner.name} CTS public-key certificate",
+                fingerprint=partner.key_fingerprint or "—",
+                valid_from=today - datetime.timedelta(days=365),
+                valid_to=valid_to,
             )
 
     def _make_rfi(self, index: int, **kwargs) -> ReportingFI:
@@ -359,17 +391,20 @@ class Command(BaseCommand):
                      foreign_tin="784199012345678", account_number="0011225577",
                      balance=Decimal("310000000.00"), gross_proceeds=Decimal("42000000.00"))
 
-        # Filing 2: submitted, awaiting validation; contains deliberate defects
-        # so the validation demo has findings to show.
+        # Filing 2: submitted and auto-validated against the CRS schema at
+        # submission (as the live flow does); its deliberate defects give the
+        # approval demo findings to act on.
         submitted = Filing.objects.create(
             reference=f"FIL-{year}-00002",
             rfi=wazobia,
             reporting_year=year,
             kind=Filing.Kind.MANUAL,
-            status=Filing.Status.SUBMITTED,
+            status=Filing.Status.UNDER_VALIDATION,
             created_by=wazobia_maker,
             checker=wazobia_checker,
             submitted_at=now - datetime.timedelta(days=1),
+            validated_at=now - datetime.timedelta(days=1),
+            validated_by=None,
         )
         self._record(submitted, 5, holder_name="Priya Raghunathan", residence_country="IN",
                      foreign_tin="ABCPR1234F", account_number="0022334455",
@@ -380,6 +415,10 @@ class Command(BaseCommand):
         self._record(submitted, 7, holder_name="Sipho Ndlovu", residence_country="US",
                      foreign_tin="123-45-6789", account_number="0022334477",
                      balance=Decimal("-500000.00"))
+        # Findings come from the real validator so the demo matches production.
+        from backoffice.validation import run_validation
+
+        run_validation(submitted)
 
         # Filing 3: returned for correction with one record already amended,
         # so the correction lineage is visible immediately.
@@ -630,13 +669,14 @@ class Command(BaseCommand):
             flagged=True,
         )
         AuditLog.record(
-            actor_name="NRS Returns Unit",
-            actor_role=Roles.ASSISTANT_ADMIN.label,
-            action="FILING_VALIDATED",
+            actor_name="CRS schema validator",
+            actor_role="System",
+            surface="portal",
+            action="FILING_AUTO_VALIDATED",
             target=f"FIL-{year}-00001",
             before_state="SUBMITTED",
             after_state="UNDER_VALIDATION",
-            detail="Validation run: 0 file-level, 0 record-level findings.",
+            detail="Automatic schema validation on submission: 0 file-level, 0 record-level findings.",
         )
         AuditLog.record(
             actor_name="NRS Returns Unit",

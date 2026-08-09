@@ -8,12 +8,19 @@
     </span>
     <h1 class="success-title">New Filing created successfully</h1>
     <p class="success-body">
+      <strong>{{ filing.created_by.display_name }}</strong> ({{ filing.created_by.get_role_display }}),
+      a {{ filing.get_kind_display }} draft has been created for
+      <strong>{{ filing.rfi.legal_name }}</strong>.
+    </p>
+    <p class="success-body">
       Your filing named &ldquo;<strong>{{ filing.name|default:filing.get_kind_display }}</strong>&rdquo; has been successfully created with the reference number
       &ldquo;<span class="success-ref">{{ filing.reference }}</span>&rdquo;. You can now access the filing in the draft filing area.
     </p>
 
     <dl class="success-meta">
       <div><dt>Filing type</dt><dd>{{ filing.get_kind_display }}</dd></div>
+      <div><dt>Created by</dt><dd>{{ filing.created_by.display_name }} ({{ filing.created_by.get_role_display }})</dd></div>
+      <div><dt>Filing for</dt><dd>{{ filing.rfi.legal_name }}</dd></div>
       {% if filing.period_end_date %}<div><dt>Period end date</dt><dd>{{ filing.period_end_date|date:"j M Y" }}</dd></div>{% endif %}
       <div><dt>Status</dt><dd>Draft</dd></div>
     </dl>

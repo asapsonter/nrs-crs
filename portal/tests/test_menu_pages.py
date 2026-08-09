@@ -209,7 +209,9 @@ def test_primary_user_can_create_and_submit_filing(portal_client: Client) -> Non
     resp = portal_client.post(f"/portal/filings/{filing.pk}/stage/")
     assert resp.status_code == 302
     filing.refresh_from_db()
-    assert filing.status == Filing.Status.SUBMITTED
+    # Submission auto-validates against the CRS schema on arrival.
+    assert filing.status == Filing.Status.UNDER_VALIDATION
+    assert filing.validated_at is not None
 
 
 def test_create_xml_carries_metadata_to_upload(maker_client: Client) -> None:
@@ -319,7 +321,7 @@ def test_draft_list_shows_new_columns(portal_client: Client) -> None:
     from portal.models import Filing, ReportingFI
 
     rfi = ReportingFI.objects.get(reference="NRS-RFI-2025-0099")
-    Filing.objects.create(
+    filing = Filing.objects.create(
         reference="FIL-2024-95001",
         name="CRS annual return 2024",
         rfi=rfi,
@@ -331,7 +333,7 @@ def test_draft_list_shows_new_columns(portal_client: Client) -> None:
     for header in ["Filing Name", "Revision", "Category", "Receiving Country", "Due Date"]:
         assert header in html, f"missing column {header}"
     assert "CRS annual return 2024" in html
-    assert "/crs/" in html  # name links to the CRS form
+    assert f"/portal/filings/{filing.pk}/view/" in html  # name opens the Form View, as in Vizor
     assert "Waiting" in html
     assert "No Data" in html
 
@@ -650,9 +652,11 @@ def test_tree_ready_to_submit_flow(maker_client: Client) -> None:
     resp = maker_client.post(f"/portal/filings/{filing.pk}/stage/")
     assert resp.status_code == 302
     filing.refresh_from_db()
-    # No maker-checker step: submission goes straight to the NRS.
-    assert filing.status == Filing.Status.SUBMITTED
+    # No maker-checker step: submission goes straight to the NRS, where it is
+    # auto-validated against the CRS schema.
+    assert filing.status == Filing.Status.UNDER_VALIDATION
     assert filing.submitted_at is not None
+    assert filing.validated_at is not None
 
 
 CSV_HEADER = (

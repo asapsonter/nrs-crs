@@ -32,6 +32,41 @@ def next_filing_reference() -> str:
     return candidate
 
 
+def auto_validate_submission(filing: Filing) -> tuple[int, int]:
+    """Validate a filing against the CRS schema standard at submission.
+
+    Validation is automatic: the moment an institution submits, the schema
+    checks run and the filing moves straight to Under Validation with its
+    findings recorded, so the Supervision Centre queue begins at approval.
+    Returns (file_level_count, record_level_count).
+    """
+    # Imported here: backoffice.validation pulls in exchange models, which
+    # must not load at portal app import time.
+    from django.utils import timezone
+
+    from backoffice.validation import run_validation
+    from core.models import AuditLog
+
+    file_count, record_count = run_validation(filing)
+    filing.status = Filing.Status.UNDER_VALIDATION
+    filing.validated_at = timezone.now()
+    filing.save(update_fields=["status", "validated_at"])
+    AuditLog.record(
+        actor_name="CRS schema validator",
+        actor_role="System",
+        surface="portal",
+        action="FILING_AUTO_VALIDATED",
+        target=filing.reference,
+        before_state=Filing.Status.SUBMITTED,
+        after_state=filing.status,
+        detail=(
+            f"Automatic schema validation on submission: {file_count} file-level, "
+            f"{record_count} record-level findings."
+        ),
+    )
+    return file_count, record_count
+
+
 def generate_temp_password() -> str:
     return secrets.token_urlsafe(9)
 
@@ -95,3 +130,75 @@ def send_rejection_email(rfi: ReportingFI) -> None:
         from_email=None,
         recipient_list=[rfi.pu_email],
     )
+
+
+def apply_notice(filing: Filing) -> str:
+    """Apply an approved administrative notice to the institution.
+
+    Returns a short description of what was applied, for the audit trail.
+    The caller is responsible for the filing's own status transition.
+    """
+    rfi = filing.rfi
+    payload = filing.notice_payload
+
+    if filing.kind == Filing.Kind.PU_CHANGE:
+        # The outgoing Primary User's access ends; the incoming officer is
+        # recorded on the institution and provisioned portal credentials.
+        old_pus = rfi.portal_users.filter(is_primary_user=True)
+        for old in old_pus:
+            old.is_primary_user = False
+            old.status = PortalUser.Status.DISABLED
+            old.save(update_fields=["is_primary_user", "status"])
+            old.user.is_active = False
+            old.user.save(update_fields=["is_active"])
+        rfi.pu_surname = payload.get("new_pu_surname", "")
+        rfi.pu_middle_name = payload.get("new_pu_middle_name", "")
+        rfi.pu_first_name = payload.get("new_pu_first_name", "")
+        rfi.pu_designation = payload.get("new_pu_designation", "")
+        rfi.pu_email = payload.get("new_pu_email", "")
+        rfi.pu_phone = payload.get("new_pu_phone", "")
+        rfi.save(update_fields=[
+            "pu_surname", "pu_middle_name", "pu_first_name",
+            "pu_designation", "pu_email", "pu_phone",
+        ])
+        display_name = " ".join(
+            part for part in (rfi.pu_first_name, rfi.pu_middle_name, rfi.pu_surname) if part
+        )
+        _, temp_password = provision_portal_user(
+            rfi,
+            name=display_name,
+            email=rfi.pu_email,
+            designation=rfi.pu_designation,
+            role=PortalUser.Role.CHECKER,
+            is_primary=True,
+        )
+        send_pu_welcome_email(rfi, temp_password)
+        return f"Primary User changed to {display_name}; credentials issued to {rfi.pu_email}."
+
+    if filing.kind == Filing.Kind.ENTITY_DEACTIVATION:
+        rfi.status = ReportingFI.Status.DEACTIVATED
+        rfi.save(update_fields=["status"])
+        for profile in rfi.portal_users.exclude(status=PortalUser.Status.DISABLED):
+            profile.status = PortalUser.Status.DISABLED
+            profile.save(update_fields=["status"])
+            profile.user.is_active = False
+            profile.user.save(update_fields=["is_active"])
+        return (
+            f"Reporting entity deactivated effective {payload.get('effective_date', '')}; "
+            "all portal users disabled."
+        )
+
+    if filing.kind == Filing.Kind.ENTITY_INFO_CHANGE:
+        rfi.legal_name = payload.get("legal_name", rfi.legal_name)
+        rfi.street = payload.get("street", rfi.street)
+        rfi.city = payload.get("city", rfi.city)
+        rfi.state_province = payload.get("state_province", rfi.state_province)
+        rfi.post_code = payload.get("post_code", rfi.post_code)
+        rfi.email = payload.get("email", rfi.email)
+        rfi.phone = payload.get("phone", rfi.phone)
+        rfi.save(update_fields=[
+            "legal_name", "street", "city", "state_province", "post_code", "email", "phone",
+        ])
+        return f"Reporting entity information updated for {rfi.legal_name}."
+
+    raise ValueError(f"Filing {filing.reference} is not an administrative notice.")

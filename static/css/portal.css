@@ -11,6 +11,35 @@
    and the Poppins/Tahoma approved typefaces. */
 
 @font-face {
+  font-family: "Raleway";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/raleway-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Raleway";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/raleway-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Raleway";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/raleway-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Roboto Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/roboto-mono-400.woff2") format("woff2");
+}
+
+@font-face {
   font-family: "Poppins";
   font-style: normal;
   font-weight: 400;
@@ -34,8 +63,9 @@
 
 :root {
   /* Prosperity Red: the brand accent for interactive elements and alerts. */
-  --red: #D42E12;
-  --red-dark: #A82410;
+  --red: #972F31;
+  --red-dark: #7E1515;
+  --maroon-deep: #5E0001;
   /* Foundation Grey: the brand neutral for identity marks and structure. */
   --foundation: #7D858B;
   --foundation-dark: #626A70;
@@ -52,7 +82,7 @@
   --border: #E5E7EB;
   --band: #F4F4F5;
   --band-light: #FAFAFA;
-  --error-tint: #FBEAE6;
+  --error-tint: #FEF2F2;
   --s1: 8px;
   --s2: 16px;
   --s3: 24px;
@@ -92,7 +122,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: "Poppins", Tahoma, Verdana, "Segoe UI", system-ui, sans-serif;
+  font-family: "Raleway", "Poppins", Tahoma, Verdana, "Segoe UI", system-ui, sans-serif;
   color: var(--charcoal);
   background: #FFFFFF;
   font-size: var(--fs-body);
@@ -250,8 +280,8 @@ a:hover { color: var(--red-dark); }
 .pt-side {
   width: 268px;
   min-width: 268px;
-  background: linear-gradient(180deg, #26262C 0%, #1D1D22 100%);
-  border-right: 1px solid #101013;
+  background: linear-gradient(180deg, #5E0001 0%, #3D0000 100%);
+  border-right: 1px solid #2E0000;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -295,14 +325,14 @@ a:hover { color: var(--red-dark); }
 }
 .pt-menu a:hover { background: rgba(255, 255, 255, 0.07); color: #FFFFFF; }
 .pt-menu a.active {
-  background: linear-gradient(90deg, rgba(224, 26, 26, 0.24), rgba(224, 26, 26, 0.10));
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06));
   color: #FFFFFF;
   font-weight: 600;
 }
 .pt-menu a.active::before {
   content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px;
-  border-radius: 0 2px 2px 0; background: var(--red);
-  box-shadow: 0 0 10px rgba(224, 26, 26, 0.6);
+  border-radius: 0 2px 2px 0; background: #FFFFFF;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 .pt-menu .pt-menu-out {
   margin-top: 12px; padding-top: 14px;
@@ -376,7 +406,7 @@ a:hover { color: var(--red-dark); }
   border-radius: 999px;
   border: 1px solid transparent;
 }
-.pt-role-badge.checker { background: var(--error-tint); color: var(--red-dark); border-color: #F2C4B8; }
+.pt-role-badge.checker { background: var(--error-tint); color: var(--red-dark); border-color: #FECACA; }
 .pt-role-badge.maker { background: #EAF1FB; color: #1E5FA8; border-color: #C6DAF2; }
 .pt-avatar {
   flex: none; width: 40px; height: 40px; border-radius: 50%;
@@ -391,12 +421,33 @@ a:hover { color: var(--red-dark); }
   margin: 0 auto;
   padding: var(--s4) var(--s3) 64px;
 }
+/* Letterhead watermark: the NRS lockup, oversized and near-invisible,
+   anchored to the lower right of the viewport behind every portal page.
+   Negative z-index paints it above the page background but beneath panels,
+   tables, and text. */
+.pt-content::before {
+  content: "";
+  position: fixed;
+  right: -60px;
+  bottom: -40px;
+  width: 560px;
+  height: 360px;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.05;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='560' height='360' viewBox='0 0 560 360'%3E%3Ctext x='8' y='218' font-family='Poppins, Tahoma, Arial, sans-serif' font-weight='700' font-size='210' letter-spacing='-6' fill='%237D858B'%3ENRS%3C/text%3E%3Crect x='14' y='244' width='368' height='16' fill='%237D858B'/%3E%3Crect x='382' y='244' width='78' height='16' fill='%23D42E12'/%3E%3Ctext x='14' y='308' font-family='Poppins, Tahoma, Arial, sans-serif' font-weight='600' font-size='30' letter-spacing='3' fill='%23D42E12'%3ENIGERIA REVENUE SERVICE%3C/text%3E%3C/svg%3E");
+}
+@media (max-width: 860px) {
+  .pt-content::before { display: none; }
+}
 /* Inside the menu layout the content fills the main column, left aligned. */
 .pt-main .pt-content { max-width: 1040px; margin: 0; padding: 32px 32px 64px; width: 100%; }
 
 @media (max-width: 860px) {
   .pt-app { flex-direction: column; }
-  .pt-side { width: 100%; min-width: 0; border-right: none; border-bottom: 1px solid #101013; }
+  .pt-side { width: 100%; min-width: 0; border-right: none; border-bottom: 1px solid #2E0000; }
   .pt-menu { flex-direction: row; flex-wrap: wrap; gap: 4px; }
   .pt-menu-group { display: none; }
   .pt-menu .pt-menu-out { margin-top: 0; padding-top: 10px; border-top: none; }
@@ -489,7 +540,7 @@ h2 { font-size: var(--fs-h2); font-weight: 600; margin: var(--s4) 0 var(--s2); }
 .deadline-banner strong { font-variant-numeric: tabular-nums; }
 .deadline-banner.overdue {
   background: var(--error-tint);
-  border-color: #F2C4B8;
+  border-color: #FECACA;
   color: var(--red-dark);
   font-weight: 600;
 }
@@ -748,11 +799,11 @@ table.data td.muted { color: var(--gray-muted); }
 .vf-status.validated { background: #E7F3EC; color: #016B41; border-color: #B9E0C8; }
 .vf-status.draft { background: #FDF3E3; color: #96610C; border-color: #EFD3A0; }
 .vf-status.nodata { background: #F4F4F5; color: #52525B; border-color: #E4E4E7; }
-.vf-status.mandatory { background: #FBEAE6; color: #A82410; border-color: #F2C4B8; }
+.vf-status.mandatory { background: #FEF2F2; color: #991B1B; border-color: #FECACA; }
 .vf-status.big { font-size: 12.5px; padding: 4px 12px; }
 .vf-badge-mand {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-  color: #B0492F; border: 1px solid #F2C4B8; border-radius: 4px; padding: 1px 6px; background: #FBEAE6;
+  color: #B91C1C; border: 1px solid #FECACA; border-radius: 4px; padding: 1px 6px; background: #FEF2F2;
 }
 
 /* Filing header */
@@ -794,12 +845,12 @@ table.data td.muted { color: var(--gray-muted); }
 
 /* Code chips: GI / CRS / RFI / AI */
 .vf-code {
-  font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  font-family: "Roboto Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
   font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
   padding: 2px 7px; border-radius: 5px; flex: none;
 }
 .vf-code.gi { background: #EAF1FB; color: #1E5FA8; }
-.vf-code.crs { background: #FBEAE6; color: #A82410; }
+.vf-code.crs { background: #FEF2F2; color: #991B1B; }
 .vf-code.rfi { background: #E7F3EC; color: #016B41; }
 .vf-code.ai { background: #ECEBFB; color: #4B3F9E; }
 .vf-code.cp { background: #FDF3E3; color: #96610C; }
@@ -863,7 +914,7 @@ label.is-dim { opacity: 0.45; }
 .vf-act:hover { border-color: #C9CDD3; background: var(--band-light); color: var(--charcoal); }
 .vf-act.add { color: #016B41; border-color: #B9E0C8; background: #F2FAF5; }
 .vf-act.add:hover { background: #E7F3EC; }
-.vf-act.danger { color: var(--red); border-color: #F2C4B8; background: #FDF3F0; }
+.vf-act.danger { color: var(--red); border-color: #FECACA; background: #FEF2F2; }
 .vf-act.danger:hover { background: var(--error-tint); color: var(--red-dark); }
 
 @media (max-width: 720px) {
@@ -922,11 +973,11 @@ label.is-dim { opacity: 0.45; }
 .success-card h1.success-title::before { content: none; }
 .success-body { font-size: 15.5px; color: var(--charcoal-2); line-height: 1.65; margin: 0 auto; max-width: 46ch; }
 .success-ref {
-  font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  font-family: "Roboto Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
   font-weight: 700;
   color: var(--red-dark);
   background: var(--error-tint);
-  border: 1px solid #F2C4B8;
+  border: 1px solid #FECACA;
   border-radius: 6px;
   padding: 1px 7px;
   white-space: nowrap;
@@ -1014,7 +1065,7 @@ label.is-dim { opacity: 0.45; }
   font-size: 11px;
   line-height: 1;
 }
-.pill.rejected, .pill.error { background: #FBEAE6; color: #A82410; border-color: #F2C4B8; }
+.pill.rejected, .pill.error { background: #FEF2F2; color: #991B1B; border-color: #FECACA; }
 .pill.correction { background: #FCEDE6; color: #B23A10; border-color: #EDB79E; }
 
 /* Forms: labels sit close to their inputs; groups separated by grid steps. */
@@ -1113,6 +1164,71 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
   font-size: 13px;
 }
 .btn.ghost:hover { background: var(--error-tint); color: var(--red-dark); box-shadow: none; }
+.btn.ghost.danger { color: var(--red); border-color: #FECACA; }
+.btn.ghost.danger:hover { background: #FEF2F2; color: var(--red-dark); border-color: var(--red); }
+
+/* ---- Upload drop zone --------------------------------------------------- */
+.upload-form { max-width: 640px; }
+.upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 42px 28px;
+  border: 2px dashed #C9CDD3;
+  border-radius: 12px;
+  background: #FCFCFD;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.upload-zone:hover, .upload-zone.is-drag, .upload-zone:focus-within {
+  border-color: var(--red);
+  background: #FFF8F7;
+}
+.upload-zone.has-file { border-style: solid; border-color: #C9CDD3; }
+.uz-input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.uz-icon { color: #9CA3AF; transition: color var(--dur-fast) var(--ease); }
+.uz-icon svg { width: 40px; height: 40px; }
+.upload-zone:hover .uz-icon, .upload-zone.is-drag .uz-icon { color: var(--red); }
+.uz-title { font-weight: 600; color: var(--charcoal); }
+.uz-browse { color: var(--red); text-decoration: underline; text-underline-offset: 3px; }
+.uz-hint { font-size: var(--fs-small); color: #6B7280; }
+.uz-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #F4F4F5;
+  border: 1px solid #E4E4E7;
+  font-family: "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--charcoal);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.uz-file svg { width: 15px; height: 15px; flex: none; color: var(--red); }
+
+/* Collapsible reference panels under the upload forms. */
+.spec-details {
+  margin-top: var(--s4);
+  border: 1px solid #E4E4E7;
+  border-radius: 10px;
+  background: #FCFCFD;
+  padding: 0 18px;
+}
+.spec-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--charcoal);
+  padding: 14px 0;
+  list-style-position: inside;
+}
+.spec-details summary:hover { color: var(--red-dark); }
+.spec-details[open] summary { border-bottom: 1px solid #EEEEF0; margin-bottom: 12px; }
+.spec-details > pre, .spec-details > table, .spec-details > p { margin-bottom: 16px; }
 .btn.dark { background: var(--charcoal-2); color: #FFFFFF; }
 .btn.dark:hover { background: var(--charcoal); box-shadow: 0 2px 8px rgba(43, 43, 43, 0.24); }
 .btn.small { padding: 4px 12px; font-size: var(--fs-small); }
@@ -1146,7 +1262,7 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: none; }
 }
-.flash.error { background: var(--error-tint); color: var(--red-dark); border-color: #F2C4B8; }
+.flash.error { background: var(--error-tint); color: var(--red-dark); border-color: #FECACA; }
 .flash.success {
   background: var(--green-tint);
   color: var(--green-dark);
@@ -1238,7 +1354,7 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
 .btn-back:focus-visible { outline: 2px solid var(--charcoal-2); outline-offset: 2px; }
 
 .muted { color: var(--gray-muted); font-size: var(--fs-small); }
-.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--fs-small); }
+.mono { font-family: "Roboto Mono", ui-monospace, Menlo, Consolas, monospace; font-size: var(--fs-small); }
 /* Country flags: sit just ahead of a jurisdiction code or name. */
 .flag { font-size: 1.08em; line-height: 1; margin-right: 6px; vertical-align: -1px; }
 .country { white-space: nowrap; }
@@ -1257,14 +1373,14 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
   background:
     repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 15px),
     repeating-linear-gradient(-45deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 15px),
-    linear-gradient(150deg, #45454D 0%, #232327 100%);
+    linear-gradient(135deg, #A03D3D 0%, #7E1515 55%, #5E0001 100%);
 }
 .landing-hero::before {
   content: "";
   position: absolute;
   top: -180px; right: -140px;
   width: 480px; height: 480px;
-  background: radial-gradient(circle, rgba(212,46,18,0.34), transparent 70%);
+  background: radial-gradient(circle, rgba(151,47,49,0.34), transparent 70%);
   pointer-events: none;
 }
 .landing-hero-inner { max-width: 1040px; margin: 0 auto; position: relative; }
@@ -1331,7 +1447,7 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
   display: flex; align-items: center; justify-content: center;
   color: #FFFFFF; margin-bottom: 18px;
 }
-.entry-card.portal .icon { background: linear-gradient(135deg, #E44E2E, var(--red)); box-shadow: 0 4px 12px rgba(212,46,18,0.28); }
+.entry-card.portal .icon { background: linear-gradient(135deg, #A03D3D, var(--red)); box-shadow: 0 4px 12px rgba(151,47,49,0.28); }
 .entry-card.office .icon { background: linear-gradient(135deg, #4A4A52, var(--charcoal)); box-shadow: 0 4px 12px rgba(43,43,43,0.28); }
 .entry-card .icon svg { width: 22px; height: 22px; }
 .entry-card .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gray-muted); }
@@ -1411,7 +1527,7 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
   width: 22px; height: 22px;
   border-radius: 50%;
   background: var(--error-tint);
-  border: 1px solid rgba(212, 46, 18, 0.35);
+  border: 1px solid rgba(151, 47, 49, 0.35);
   color: var(--red-dark);
   display: flex; align-items: center; justify-content: center;
   font-size: 12px;
@@ -1527,7 +1643,7 @@ form.stacked .phone-group input { flex: 1 1 auto; width: auto; max-width: none; 
 .enrol-type-card:has(input:checked) {
   border-color: var(--red);
   background: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(212, 46, 18, 0.15);
+  box-shadow: 0 0 0 3px rgba(151, 47, 49, 0.15);
   transform: none;
 }
 .enrol-type-card:has(input:checked) .etc-icon { background: var(--error-tint); color: var(--red); }
@@ -1596,11 +1712,11 @@ form.stacked .phone-group input { flex: 1 1 auto; width: auto; max-width: none; 
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #E44E2E, var(--red));
+  background: linear-gradient(135deg, #A03D3D, var(--red));
   color: #FFFFFF;
   font-size: 14px;
   font-weight: 700;
-  box-shadow: 0 2px 6px rgba(212, 46, 18, 0.28);
+  box-shadow: 0 2px 6px rgba(151, 47, 49, 0.28);
 }
 .fset-title { font-size: 17px; font-weight: 700; color: var(--charcoal); margin: 2px 0 0; }
 .fset-hint { font-size: 13px; color: var(--gray-muted); margin: 3px 0 0; line-height: 1.5; }
@@ -1674,6 +1790,18 @@ form.stacked .field .phone-group input { width: auto; }
   font-weight: 700;
   line-height: 20px;
   text-align: center;
+}
+/* Accuracy confirmation: the note is a checkbox the applicant must tick
+   before the application can go in; the checkbox replaces the "!" mark. */
+.enrol-actions-note.enrol-confirm { cursor: pointer; user-select: none; }
+.enrol-actions-note.enrol-confirm::before { content: none; }
+form.stacked .enrol-actions-note.enrol-confirm input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  margin-top: 3px;
+  accent-color: var(--red);
+  cursor: pointer;
 }
 
 @media (max-width: 640px) {
@@ -1779,6 +1907,10 @@ table.data tbody tr:nth-child(n+7) { animation-delay: 150ms; }
   text-transform: uppercase;
   color: var(--red);
 }
+.nrs-logo.lg .nrs-logo-mark { font-size: 40px; padding: 0 18px 12px 0; margin-right: 15px; border-right-width: 2px; }
+.nrs-logo.lg .nrs-logo-rule { right: 39px; height: 4.5px; }
+.nrs-logo.lg .nrs-logo-rule::after { right: -21px; width: 15px; height: 4.5px; }
+.nrs-logo.lg .nrs-logo-name { font-size: 15.5px; letter-spacing: 1.2px; }
 .nrs-logo.sm .nrs-logo-mark { font-size: 20px; padding: 0 9px 6px 0; margin-right: 8px; }
 .nrs-logo.sm .nrs-logo-rule { right: 20px; height: 2.5px; }
 .nrs-logo.sm .nrs-logo-rule::after { right: -11px; width: 8px; height: 2.5px; }
@@ -1809,3 +1941,130 @@ table.data tbody tr:nth-child(n+7) { animation-delay: 150ms; }
   font-size: 15px;
   color: #FF8A73;
 }
+
+
+/* Surface language from selfservice.nrs.gov.ng: rounded corners and soft
+   card shadows over white, in the manner of the taxpayer self-service
+   portal. Appended last so these override the flat defaults above. */
+.btn { border-radius: 8px; }
+.panel { border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+form.stacked input, form.stacked select, form.stacked textarea { border-radius: 8px; }
+.flash { border-radius: 10px; }
+.error-text { border-radius: 8px; }
+table.data { border-radius: 10px; overflow: hidden; }
+
+
+/* ---------------------------------------------------------------------- */
+/* Polish layer: sticky chrome, dark-rail focus visibility, slim           */
+/* scrollbars, the rounded-surface language extended to the last flat      */
+/* components, small-screen coverage, and print output. Appended last so   */
+/* it wins the cascade without touching the rules above.                   */
+/* ---------------------------------------------------------------------- */
+
+/* The page gutter is reserved up front so layout never shifts between
+   short and long pages. */
+html { scrollbar-gutter: stable; }
+
+/* Text selection carries the brand accent. */
+::selection { background: var(--red); color: #FFFFFF; }
+
+/* The global charcoal focus ring is invisible on the maroon rail; focus
+   there is marked in light instead. */
+.pt-side :focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: -2px;
+}
+
+/* Slim scrollbars on the menu rail and horizontally scrolling panes. */
+.pt-menu { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent; }
+.pt-menu::-webkit-scrollbar { width: 8px; }
+.pt-menu::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); border-radius: 4px; }
+.table-wrap, .vf-tree-card { scrollbar-width: thin; scrollbar-color: #C9CDD3 transparent; }
+.table-wrap::-webkit-scrollbar, .vf-tree-card::-webkit-scrollbar { height: 8px; }
+.table-wrap::-webkit-scrollbar-thumb, .vf-tree-card::-webkit-scrollbar-thumb { background: #C9CDD3; border-radius: 4px; }
+
+/* The menu rail and topbar hold their place on long working pages. Scoped
+   to widths where the rail is a column; below 860px the layout stacks. */
+@media (min-width: 861px) {
+  .pt-side { position: sticky; top: 0; height: 100vh; }
+  .pt-topbar { position: sticky; top: 0; z-index: 5; }
+}
+
+/* Rounded-surface language extended to the last flat components. */
+.deadline-banner { border-radius: 10px; }
+fieldset { border-radius: 10px; }
+.login-box { border-radius: 12px; box-shadow: 0 10px 34px rgba(24, 24, 27, 0.08); }
+
+/* Small screens: the public header wraps, tabs scroll sideways in place,
+   and key-value grids collapse to a single column. */
+@media (max-width: 720px) {
+  .pt-header .bar { flex-wrap: wrap; gap: var(--s2); }
+  .pt-nav { overflow-x: auto; }
+  .pt-nav a { white-space: nowrap; }
+  .pt-topbar { flex-wrap: wrap; }
+}
+@media (max-width: 560px) {
+  .kv { grid-template-columns: 1fr; row-gap: 2px; }
+  .kv dt { margin-top: var(--s1); }
+  .kv dt:first-of-type { margin-top: 0; }
+}
+
+/* Print: the record, not the chrome. Animations are also disabled because
+   `animation-fill-mode: both` could otherwise print a page at opacity 0. */
+@media print {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .pt-header, .pt-nav, .pt-side, .pt-topbar, .back-nav, .actions-row,
+  .btn, .flag-ribbon, .val-overlay { display: none !important; }
+  .pt-main .pt-content, .pt-content { max-width: none; margin: 0; padding: 0; }
+  table.data, .panel, .fset, .auth-card { box-shadow: none; }
+  table.data thead th { background: #3F3F46; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* ── Validation report ──────────────────────────────────────────────────────
+   Shown after an XML upload. The outcome banner states plainly whether the
+   return reached the Supervision Centre, because that is the one thing a
+   filer needs to know before reading any finding. */
+.vr-outcome {
+  display: flex;
+  gap: var(--s2);
+  align-items: flex-start;
+  padding: var(--s3);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  margin-bottom: var(--s4);
+}
+.vr-outcome h2 { font-size: var(--fs-h2); margin: 0 0 6px; }
+.vr-outcome p { margin: 0; color: var(--gray-text); max-width: 70ch; }
+.vr-outcome.ok { background: var(--green-tint); border-color: rgba(0, 135, 81, 0.32); }
+.vr-outcome.ok h2 { color: var(--green-dark); }
+.vr-outcome.bad { background: var(--error-tint); border-color: rgba(151, 47, 49, 0.32); }
+.vr-outcome.bad h2 { color: var(--red-dark); }
+.vr-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: #FFFFFF;
+}
+.vr-mark svg { width: 19px; height: 19px; }
+.vr-outcome.ok .vr-mark { background: var(--green); }
+.vr-outcome.bad .vr-mark { background: var(--red); }
+
+.vr-block { margin-bottom: var(--s4); }
+.vr-title {
+  font-size: 15.5px;
+  font-weight: 700;
+  margin: 0 0 var(--s1);
+  color: var(--charcoal);
+}
+.vr-block .muted { margin: 0 0 var(--s2); max-width: 78ch; }
+/* Finding messages quote MessageRefIds and DocRefIds far longer than any
+   natural word; let them break so the Issue column keeps its width. */
+.vr-block table.data td { overflow-wrap: break-word; word-break: break-word; vertical-align: top; }
+.vr-block table.data { table-layout: fixed; }
+.vr-block table.data td:first-child { white-space: nowrap; }
+.vr-actions { display: flex; flex-wrap: wrap; gap: var(--s1); margin-top: var(--s4); }
+.btn.sm { padding: 5px 12px; font-size: 13px; }

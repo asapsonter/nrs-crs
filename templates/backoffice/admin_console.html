@@ -2,7 +2,7 @@
 {% block title %}Admin Console · NRS Supervision Centre{% endblock %}
 {% block content %}
 <h1>Admin Console</h1>
-<p class="page-sub">Create internal users, assign them roles, and issue time-boxed credentials valid for whole months, usable during working hours (08:00&ndash;18:00 WAT). Administrators administer; they do not process casework.</p>
+<p class="page-sub">Create internal users, assign them roles, and issue time-boxed credentials valid for whole months. Administrators administer; they do not process casework.</p>
 
 {% if issued %}
 <div class="panel" style="border-color: var(--red);">
@@ -13,7 +13,7 @@
     <dt>Sign-in email</dt><dd class="mono">{{ issued.0.officer.email }}</dd>
     <dt>Credential reference</dt><dd class="mono">{{ issued.0.username }}</dd>
     <dt>Passcode</dt><dd class="mono"><strong>{{ issued.1 }}</strong></dd>
-    <dt>Validity</dt><dd>{% if issued.0.is_unlimited %}Unlimited &middot; no expiry, no working-hours limit{% else %}{{ issued.0.validity_display }} from first use &middot; daily access 08:00&ndash;18:00{% endif %}</dd>
+    <dt>Validity</dt><dd>{% if issued.0.is_unlimited %}Unlimited &middot; no expiry{% else %}{{ issued.0.validity_display }} from first use{% endif %}</dd>
     <dt>Valid for first use until</dt><dd>{{ issued.0.expires_if_unused_at|date:"Y-m-d H:i" }}</dd>
   </dl>
   <p class="muted">The passcode is stored hashed and cannot be retrieved again. If lost, revoke and issue a new credential.</p>
@@ -43,7 +43,7 @@
       <option value="12">12 months</option>
       <option value="0">Unlimited &mdash; no time or working-hours limit</option>
     </select>
-    <p class="muted">Officers sign in with the credential each working day; access runs 08:00&ndash;18:00 (WAT) until the validity window ends.</p>
+    <p class="muted">Officers sign in with the credential at any time until the validity window ends.</p>
     <div class="actions-row">
       <button type="submit" class="btn">Issue credential</button>
       <a class="btn secondary" href="/backoffice/admin-console/officers/">Manage users</a>

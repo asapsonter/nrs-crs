@@ -11,10 +11,19 @@
 <dl class="kv">
   <dt>Submitted</dt><dd>{{ filing.submitted_at|date:"Y-m-d H:i"|default:"-" }}</dd>
   <dt>Prepared / submitted by</dt><dd>{{ filing.created_by.display_name|default:"-" }} / {{ filing.checker.display_name|default:"-" }}</dd>
-  <dt>Validated</dt><dd>{{ filing.validated_at|date:"Y-m-d H:i"|default:"not yet validated" }}{% if filing.validated_by %} by {{ filing.validated_by.name|default:"NRS Returns Unit" }}{% endif %}</dd>
+  <dt>Validated</dt><dd>{{ filing.validated_at|date:"Y-m-d H:i"|default:"not yet validated" }}{% if filing.validated_at %} by {% if filing.validated_by %}{{ filing.validated_by.name }}{% else %}automatic CRS schema validation at submission{% endif %}{% endif %}</dd>
   <dt>Records (live / superseded)</dt><dd>{{ filing.account_reports.count }} total</dd>
   {% if filing.return_reason %}<dt>Last return reason</dt><dd>{{ filing.return_reason }}</dd>{% endif %}
 </dl>
+
+{% if filing.is_crs_data %}
+<p style="margin-bottom: 16px;">
+  <a class="btn secondary" href="/backoffice/returns/{{ filing.pk }}/download/">Download filing as CRS XML</a>
+  {% if filing.uploaded_filename %}
+  <span class="muted" style="margin-left: 8px;">Originally uploaded as {{ filing.uploaded_filename }}</span>
+  {% endif %}
+</p>
+{% endif %}
 
 {% if can_validate %}
 <form method="post" action="/backoffice/returns/{{ filing.pk }}/validate/" style="margin-bottom: 16px;">
@@ -63,6 +72,24 @@
     </tr>
     {% empty %}
     <tr><td colspan="6" class="muted">No record-level errors.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if filing.is_notice %}
+<h2>Notice details</h2>
+<p class="muted">
+  {{ filing.get_kind_display }} submitted by {{ filing.rfi.legal_name }}.
+  Approval applies the change below{% if filing.kind == 'PU_CHANGE' %} and issues portal credentials to the incoming Primary User{% elif filing.kind == 'ENTITY_DEACTIVATION' %} and disables the entity's portal access{% endif %}.
+</p>
+<table class="data" style="max-width: 720px;">
+  <tbody>
+    {% for label, value in notice_fields %}
+    <tr>
+      <th style="width: 260px; text-align: left;">{{ label }}</th>
+      <td>{{ value|default:"&mdash;" }}</td>
+    </tr>
     {% endfor %}
   </tbody>
 </table>
@@ -170,7 +197,13 @@
 {% if can_approve %}
 <div class="panel mt">
   <h2 style="margin-top: 0;">Supervisor approval</h2>
-  <p class="muted">No blocking findings remain. Approval releases the records for exchange packaging.</p>
+  <p class="muted">
+    {% if filing.is_notice %}
+    No blocking findings remain. Approval applies the requested change to the institution.
+    {% else %}
+    No blocking findings remain. Approval releases the records for exchange packaging.
+    {% endif %}
+  </p>
   <form method="post" action="/backoffice/returns/{{ filing.pk }}/approve/">
     {% csrf_token %}
     <button type="submit" class="btn">Approve for exchange</button>

@@ -25,8 +25,9 @@ REQUIRED_FIELDS: list[tuple[str, str]] = [
     ("State or province", "state_province"),
     ("Post code", "post_code"),
     ("Primary User surname", "pu_surname"),
-    ("Primary User other names", "pu_first_name"),
+    ("Primary User firstname", "pu_first_name"),
     ("Date of birth", "pu_dob"),
+    ("Place of birth", "pu_place_of_birth"),
     ("Primary User position", "pu_designation"),
     ("Primary User email", "pu_email"),
     ("Primary User telephone", "pu_phone"),
@@ -58,6 +59,7 @@ def enrol(request):
             "pu_middle_name": request.POST.get("pu_middle_name", "").strip(),
             "pu_first_name": request.POST.get("pu_first_name", "").strip(),
             "pu_dob": parse_date(request.POST.get("pu_dob", "").strip() or "") or None,
+            "pu_place_of_birth": request.POST.get("pu_place_of_birth", "").strip(),
             "pu_designation": request.POST.get("pu_designation", "").strip(),
             "pu_email": request.POST.get("pu_email", "").strip().lower(),
             "pu_phone_cc": pu_phone_cc if pu_phone_cc in valid_codes else "+234",
@@ -96,6 +98,13 @@ def enrol(request):
             errors.append("The Letter of Authorisation is required.")
         elif not ceo_letter.name.lower().endswith(".pdf"):
             errors.append("The Letter of Authorisation must be a PDF document.")
+
+        # The applicant must tick the accuracy confirmation; the browser
+        # enforces it too, but the server is the authority.
+        if request.POST.get("confirm_accuracy") != "yes":
+            errors.append(
+                "Tick the confirmation that the information provided is accurate and complete."
+            )
 
         if ReportingFI.objects.filter(tin=fields["tin"]).exclude(status=ReportingFI.Status.REJECTED).exists():
             errors.append("An application or enrolment already exists for this TIN.")

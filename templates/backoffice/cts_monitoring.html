@@ -1,0 +1,96 @@
+{% extends "backoffice/base.html" %}
+{% load pills flags %}
+{% block title %}CTS Monitoring · NRS Supervision Centre{% endblock %}
+{% block content %}
+<h1>CTS Monitoring</h1>
+<p class="page-sub">Operational visibility over the Common Transmission System: readiness, transmissions, receipts, open exceptions and certificate validity.</p>
+
+{% if exception_total %}
+<div class="flash error">{{ exception_total }} open CTS exception{{ exception_total|pluralize }} require attention &mdash; failed transmissions, pending corrections, rejected files, unresolved status messages or expiring certificates.</div>
+{% else %}
+<div class="flash success">No open CTS exceptions. All transmissions, corrections and certificates are current.</div>
+{% endif %}
+
+<div class="card-grid">
+  <div class="stat-card static"><div class="label">Ready to transmit</div><div class="value">{{ tiles.ready }}</div></div>
+  <div class="stat-card static"><div class="label">Transmitted, awaiting response</div><div class="value">{{ tiles.transmitted }}</div></div>
+  <div class="stat-card static"><div class="label">Failed transmissions</div><div class="value {% if tiles.failed %}alert{% endif %}">{{ tiles.failed }}</div></div>
+  <div class="stat-card static"><div class="label">Pending corrections</div><div class="value {% if tiles.pending_corrections %}alert{% endif %}">{{ tiles.pending_corrections }}</div></div>
+  <div class="stat-card static"><div class="label">Inbound files in process</div><div class="value">{{ tiles.received }}</div></div>
+  <div class="stat-card static"><div class="label">Rejected inbound files</div><div class="value {% if tiles.rejected_inbound %}alert{% endif %}">{{ tiles.rejected_inbound }}</div></div>
+  <div class="stat-card static"><div class="label">Certificates expiring</div><div class="value {% if tiles.expiring_certs %}alert{% endif %}">{{ tiles.expiring_certs }}</div></div>
+  <div class="stat-card static"><div class="label">Exchanges archived</div><div class="value">{{ tiles.archived }}</div></div>
+</div>
+
+<h2>Exception report</h2>
+
+<div class="panel">
+  <h2 style="margin-top: 0;">Failed transmissions &amp; rejected files</h2>
+  {% if exceptions.failed_transmissions or exceptions.rejected_inbound %}
+  <table class="data">
+    <thead><tr><th>Direction</th><th>MessageRefID</th><th>Partner</th><th>Regime</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for p in exceptions.failed_transmissions %}
+      <tr>
+        <td>Outbound</td><td class="mono">{{ p.message_ref_id }}</td>
+        <td>{% country p.jurisdiction.code p.jurisdiction.name %}</td><td>{{ p.regime }}</td>
+        <td>{% pill p.status p.get_status_display %}</td>
+        <td><a href="/backoffice/exchange/packages/{{ p.pk }}/">Open</a></td>
+      </tr>
+      {% endfor %}
+      {% for f in exceptions.rejected_inbound %}
+      <tr>
+        <td>Inbound</td><td class="mono">{{ f.message_ref_id }}</td>
+        <td>{% country f.jurisdiction.code f.jurisdiction.name %}</td><td>{{ f.regime }}</td>
+        <td>{% pill f.status f.get_status_display %}</td>
+        <td><a href="/backoffice/exchange/inbound/{{ f.pk }}/">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">None.</p>{% endif %}
+</div>
+
+<div class="panel">
+  <h2 style="margin-top: 0;">Unresolved status messages &amp; pending corrections</h2>
+  {% if exceptions.unresolved_record_errors %}
+  <table class="data">
+    <thead><tr><th>DocRefID</th><th>Code</th><th>Detail</th><th>On package</th><th></th></tr></thead>
+    <tbody>
+      {% for e in exceptions.unresolved_record_errors %}
+      <tr>
+        <td class="mono">{{ e.doc_ref_id }}</td><td class="mono">{{ e.code }}</td><td>{{ e.detail }}</td>
+        <td class="mono">{{ e.status_message.package.message_ref_id|default:"-" }}</td>
+        <td><a href="/backoffice/exchange/corrections/">Correct</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No unresolved record-level status messages.</p>{% endif %}
+</div>
+
+<h2>Certificate inventory</h2>
+<p class="page-sub">Certificates within {{ warning_days }} days of expiry, or already expired, are flagged for renewal.</p>
+<table class="data">
+  <thead><tr><th>Owner</th><th>Subject</th><th>Jurisdiction</th><th>Fingerprint</th><th>Valid to</th><th>Days left</th><th>Status</th></tr></thead>
+  <tbody>
+    {% for cert in certificates %}
+    <tr>
+      <td>{{ cert.get_owner_display }}</td>
+      <td>{{ cert.subject }}</td>
+      <td>{% if cert.jurisdiction %}{{ cert.jurisdiction.code|flag }}{{ cert.jurisdiction.code }}{% else %}&mdash;{% endif %}</td>
+      <td class="mono">{{ cert.fingerprint }}</td>
+      <td>{{ cert.valid_to|date:"Y-m-d" }}</td>
+      <td class="num">{{ cert.days_to_expiry }}</td>
+      <td>
+        {% if cert.is_expired %}<span class="pill rejected">{{ cert.status_label }}</span>
+        {% elif cert.is_expiring %}<span class="pill warning">{{ cert.status_label }}</span>
+        {% else %}<span class="pill approved">{{ cert.status_label }}</span>{% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">No certificates in the inventory.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

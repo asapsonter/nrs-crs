@@ -53,20 +53,59 @@
   {% elif filing.status == 'DRAFT' %}
   <span class="vf-status draft big">In Draft</span>
   {% else %}
-  <span class="vf-status draft big">{{ filing.get_status_display }}</span>
+  <span class="vf-status draft big">{{ filing.fi_status_display }}</span>
   {% endif %}
 </div>
 
-{# The CRS message structure as a folder tree. Actions operate on the real
-   filing: General Information opens the CRS header form, account records can
-   be added, edited, and deleted, and the report can be cleared. #}
+{% comment %}
+The CRS message structure as a folder tree. Actions operate on the real
+filing: General Information opens the CRS header form, account records can
+be added, edited, and deleted, and the report can be cleared.
+{% endcomment %}
+{% if filing.is_notice %}
+{# An administrative notice is a single form: edit, validate, submit. #}
+<div class="vf-tree-card">
+<ul class="vf-tree">
+  <li class="vf-node">
+    <div class="vf-row">
+      <span class="vf-ic type-formset">{% include "portal/_vf_icons.html" with i="formset" %}</span>
+      <span class="vf-title">{{ filing.name|default:filing.get_kind_display }}</span>
+      <span class="vf-status draft">{% if filing.status == 'DRAFT' %}In Draft{% else %}{{ filing.fi_status_display }}{% endif %}</span>
+    </div>
+    <ul>
+      <li class="vf-node">
+        <div class="vf-row">
+          <span class="vf-ic type-form">{% include "portal/_vf_icons.html" with i="form" %}</span>
+          <span class="vf-title">{{ filing.get_kind_display }} form</span>
+          {% if filing.notice_validated %}<span class="vf-status validated">Validated</span>
+          {% elif filing.notice_payload %}<span class="vf-status draft">In Draft</span>
+          {% else %}<span class="vf-status nodata">No Data</span>{% endif %}
+          <span class="vf-badge-mand">Mandatory</span>
+          <span class="vf-actions">
+            {% if can_edit %}
+            <a class="vf-act" href="/portal/filings/{{ filing.pk }}/notice/">Edit</a>
+            {% endif %}
+            <a class="vf-act" href="/portal/filings/{{ filing.pk }}/notice/?mode=view">View</a>
+          </span>
+        </div>
+      </li>
+    </ul>
+  </li>
+</ul>
+</div>
+{% else %}
 <div class="vf-tree-card">
 <ul class="vf-tree">
   <li class="vf-node">
     <div class="vf-row">
       <span class="vf-ic type-formset">{% include "portal/_vf_icons.html" with i="formset" %}</span>
       <span class="vf-title">{{ filing.get_kind_display }}</span>
-      <span class="vf-status draft">{% if filing.status == 'DRAFT' %}In Draft{% else %}{{ filing.get_status_display }}{% endif %}</span>
+      <span class="vf-status draft">{% if filing.status == 'DRAFT' %}In Draft{% else %}{{ filing.fi_status_display }}{% endif %}</span>
+      {% if can_edit and filing.kind == 'XML_UPLOAD' %}
+      <span class="vf-actions"><a class="vf-act add" href="/portal/filings/upload/">Upload Data</a></span>
+      {% elif can_edit and filing.kind == 'EXCEL_UPLOAD' %}
+      <span class="vf-actions"><a class="vf-act add" href="/portal/filings/upload/excel/">Upload Data</a></span>
+      {% endif %}
     </div>
 
     <ul>
@@ -238,10 +277,13 @@
   </li>
 </ul>
 </div>
+{% endif %}
 
-{# Validate and Submit: mirrors the Vizor workflow. When every form is
-   Validated the filing is Ready to Submit, and any portal user (Primary or
-   Secondary) submits it to the NRS directly. #}
+{% comment %}
+Validate and Submit: mirrors the Vizor workflow. When every form is
+Validated the filing is Ready to Submit, and any portal user (Primary or
+Secondary) submits it to the NRS directly.
+{% endcomment %}
 <div class="vf-submit-panel">
   {% if can_submit %}
   <div class="vf-submit-ready">
@@ -259,9 +301,13 @@
   <div class="vf-submit-blocked">
     <strong>Not yet ready to submit.</strong>
     <ul class="vf-todo">
+      {% if filing.is_notice %}
+      <li>Complete and validate the {{ filing.get_kind_display }} form.</li>
+      {% else %}
       {% if not header_done %}<li>Complete and validate the General Information form.</li>{% endif %}
       {% if not record_count and filing.kind != 'NIL' %}<li>Add at least one Account Information form.</li>{% endif %}
       {% if incomplete_count %}<li>{{ incomplete_count }} Account Information form{{ incomplete_count|pluralize }} still in draft (missing address, self-certification, TIN or reason, or controlling persons).</li>{% endif %}
+      {% endif %}
     </ul>
   </div>
   {% endif %}

@@ -26,22 +26,25 @@
   {% endif %}
 </div>
 
-<h2>Outgoing packages</h2>
+<h2>Outgoing transmission register</h2>
 <table class="data">
-  <thead><tr><th>MessageRefID</th><th>Partner</th><th>Type</th><th>Records</th><th>Status</th><th>Created</th><th></th></tr></thead>
+  <thead><tr><th>MessageRefID</th><th>Regime</th><th>Partner</th><th>Type</th><th>Ver.</th><th>Records</th><th>Status</th><th>Responsible officer</th><th>Created</th><th></th></tr></thead>
   <tbody>
     {% for package in packages %}
     <tr>
       <td class="mono">{{ package.message_ref_id }}</td>
+      <td>{{ package.regime }}</td>
       <td>{% country package.jurisdiction.code package.jurisdiction.name %}</td>
       <td>{{ package.message_type }}</td>
+      <td class="num">v{{ package.file_version }}</td>
       <td class="num">{{ package.records.count }}</td>
       <td>{% pill package.status package.get_status_display %}</td>
+      <td>{{ package.responsible_officer.name|default:"—" }}</td>
       <td>{{ package.created_at|date:"Y-m-d H:i" }}</td>
       <td><a href="/backoffice/exchange/packages/{{ package.pk }}/">Open</a></td>
     </tr>
     {% empty %}
-    <tr><td colspan="7" class="muted">No packages built yet.</td></tr>
+    <tr><td colspan="10" class="muted">No packages built yet.</td></tr>
     {% endfor %}
   </tbody>
 </table>

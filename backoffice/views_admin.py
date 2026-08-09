@@ -26,7 +26,7 @@ def _posted_roles(request) -> list[str]:
 @superadmin_required
 def console(request):
     """Issue credentials to existing users and review recent issuance."""
-    from core import config, workhours
+    from core import config
 
     issued: tuple[IssuedCredential, str] | None = None
     if request.method == "POST":
@@ -35,7 +35,7 @@ def console(request):
             session_months = int(request.POST.get("session_months", "-1"))
         except ValueError:
             session_months = -1
-        # 0 is the explicit "unlimited" choice: no expiry, no working hours.
+        # 0 is the explicit "unlimited" choice: no expiry.
         if session_months < 0 or session_months > config.CREDENTIAL_MAX_MONTHS:
             messages.error(
                 request,
@@ -48,13 +48,12 @@ def console(request):
             if credential.is_unlimited:
                 detail = (
                     f"Issued to {officer.name} with roles {credential.role_display} "
-                    "with unlimited validity: no expiry and no working-hours confinement."
+                    "with unlimited validity: no expiry."
                 )
             else:
                 detail = (
                     f"Issued to {officer.name} with roles {credential.role_display} "
-                    f"for a {session_months} month validity window, daily access "
-                    f"{workhours.working_hours_label()}."
+                    f"for a {session_months} month validity window."
                 )
             AuditLog.record(
                 actor_name="Super Admin",

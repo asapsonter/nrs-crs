@@ -1,0 +1,57 @@
+{% comment %}
+Drag-and-drop file picker. Parameters: accept (input accept attr), hint
+(one-line format guidance shown under the title). The input keeps the
+name `crs_file` that both upload views read.
+{% endcomment %}
+<label class="upload-zone" id="upload-zone">
+  <input class="uz-input" type="file" name="crs_file" id="crs_file" accept="{{ accept }}" required>
+  <span class="uz-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M12 12v9"/><path d="m8 16 4-4 4 4"/></svg>
+  </span>
+  <span class="uz-title"><span class="uz-browse">Choose a file</span> or drag it here</span>
+  <span class="uz-hint">{{ hint }}</span>
+  <span class="uz-file" id="uz-file" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+    <span id="uz-file-name"></span>
+  </span>
+</label>
+<script>
+(function () {
+  var zone = document.getElementById("upload-zone");
+  var input = document.getElementById("crs_file");
+  var chip = document.getElementById("uz-file");
+  var name = document.getElementById("uz-file-name");
+  if (!zone || !input) return;
+
+  function show() {
+    if (!input.files.length) return;
+    var file = input.files[0];
+    var size = file.size < 1024 * 1024
+      ? Math.max(1, Math.round(file.size / 1024)) + " KB"
+      : (file.size / (1024 * 1024)).toFixed(1) + " MB";
+    name.textContent = file.name + " · " + size;
+    chip.hidden = false;
+    zone.classList.add("has-file");
+  }
+
+  input.addEventListener("change", show);
+  ["dragenter", "dragover"].forEach(function (event) {
+    zone.addEventListener(event, function (e) {
+      e.preventDefault();
+      zone.classList.add("is-drag");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (event) {
+    zone.addEventListener(event, function (e) {
+      e.preventDefault();
+      zone.classList.remove("is-drag");
+    });
+  });
+  zone.addEventListener("drop", function (e) {
+    if (e.dataTransfer && e.dataTransfer.files.length) {
+      input.files = e.dataTransfer.files;
+      show();
+    }
+  });
+})();
+</script>
