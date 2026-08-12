@@ -19,7 +19,67 @@
   {% endif %}
   <div class="fm-item"><span class="fm-k">Prepared by</span><span class="fm-v">{{ filing.created_by.display_name|default:"-" }}</span></div>
   <div class="fm-item"><span class="fm-k">Created</span><span class="fm-v">{{ filing.created_at|date:"j M Y" }}</span></div>
+  {% if filing.corrects %}
+  <div class="fm-item"><span class="fm-k">Corrects</span><span class="fm-v mono">{{ filing.corrects.reference }}</span></div>
+  {% endif %}
 </div>
+
+{% if can_open_correction %}
+{% if filing.kind == 'XML_UPLOAD' %}
+{% comment %}
+An uploaded document may carry many account reports, so its amendment is
+edited in XML; manual filings keep the record-by-record form flow.
+{% endcomment %}
+<p style="margin-bottom: 16px;">
+  <a class="btn secondary" href="/portal/filings/{{ filing.pk }}/correct/xml/">Amend in XML</a>
+</p>
+{% else %}
+<form method="post" action="/portal/filings/{{ filing.pk }}/correct/" style="margin-bottom: 16px;"
+      onsubmit="return confirm('Open a correction filing for {{ filing.reference }}? The filed records stay as they are until the correction is submitted and accepted.');">
+  {% csrf_token %}
+  <button type="submit" class="btn secondary">Create correction filing</button>
+</form>
+{% endif %}
+{% endif %}
+
+{% if correction_source %}
+<div class="panel band">
+  <h2 style="margin-top: 0;">Records filed in {{ filing.corrects.reference }}</h2>
+  <p class="muted">
+    Pull a filed record into this correction as an <strong>amendment</strong> (OECD2, opens for
+    editing) or a <strong>deletion</strong> (OECD3, instructs partner jurisdictions to remove it).
+    Each pulled record carries a CorrDocRefID reference to the filed version.
+  </p>
+  <div class="table-wrap">
+  <table class="data">
+    <thead>
+      <tr><th>Account holder</th><th>Account number</th><th>DocRefID</th><th style="width:200px">Action</th></tr>
+    </thead>
+    <tbody>
+      {% for row in correction_source %}
+      <tr>
+        <td>{{ row.record.holder_name }}</td>
+        <td class="mono">{{ row.record.account_number }}</td>
+        <td class="mono">{{ row.record.doc_ref_id }}</td>
+        <td>
+          {% if row.picked %}
+          <span class="tag-cat">In this correction</span>
+          {% else %}
+          <form method="post" action="/portal/filings/{{ filing.pk }}/correction/records/{{ row.record.pk }}/pick/" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" name="action" value="amend" class="btn ghost sm">Amend</button>
+            <button type="submit" name="action" value="delete" class="btn ghost sm danger"
+                    onclick="return confirm('Stage deletion of this record? Partner jurisdictions will be instructed to remove it.');">Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
 
 {% if filing.checker_comment and filing.status == 'DRAFT' %}
 <div class="flash error"><strong>Comments:</strong> {{ filing.checker_comment }}</div>
@@ -110,7 +170,7 @@
 </table>
 {% endif %}
 
-{% if can_edit %}
+{% if can_edit and not filing.corrects %}
 <div class="panel band" id="add-record">
   <h2 style="margin-top: 0;">Add account report</h2>
   <form method="post" action="/portal/filings/{{ filing.pk }}/records/add/" class="stacked">

@@ -193,7 +193,7 @@ def test_created_screen_shows_name_and_reference(portal_client: Client) -> None:
     assert "success-ref" in html
 
 
-def test_primary_user_can_create_and_submit_filing(portal_client: Client) -> None:
+def test_primary_user_can_create_and_submit_filing(portal_client: Client, partners) -> None:
     """The Primary User files and submits directly; no maker-checker step."""
     from portal.models import Filing
 
@@ -210,7 +210,7 @@ def test_primary_user_can_create_and_submit_filing(portal_client: Client) -> Non
     assert resp.status_code == 302
     filing.refresh_from_db()
     # Submission auto-validates against the CRS schema on arrival.
-    assert filing.status == Filing.Status.UNDER_VALIDATION
+    assert filing.status == Filing.Status.ACCEPTED  # auto-accepted on passing validation
     assert filing.validated_at is not None
 
 
@@ -629,7 +629,7 @@ def test_tree_shows_cp_folder_and_record_status(maker_client: Client) -> None:
     assert "Not yet ready to submit" in html
 
 
-def test_tree_ready_to_submit_flow(maker_client: Client) -> None:
+def test_tree_ready_to_submit_flow(maker_client: Client, partners) -> None:
     """When GI is validated and every account form is complete, the tree
     shows Ready to Submit and Validate & Submit stages the filing."""
     from portal.models import ControllingPerson, Filing, ReportingFI
@@ -654,7 +654,7 @@ def test_tree_ready_to_submit_flow(maker_client: Client) -> None:
     filing.refresh_from_db()
     # No maker-checker step: submission goes straight to the NRS, where it is
     # auto-validated against the CRS schema.
-    assert filing.status == Filing.Status.UNDER_VALIDATION
+    assert filing.status == Filing.Status.ACCEPTED  # auto-accepted on passing validation
     assert filing.submitted_at is not None
     assert filing.validated_at is not None
 

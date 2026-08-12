@@ -1211,6 +1211,29 @@ form.stacked input[type="checkbox"], form.stacked input[type="radio"] { accent-c
 }
 .uz-file svg { width: 15px; height: 15px; flex: none; color: var(--red); }
 
+/* XML amendment editor: a code surface for editing CRS documents. */
+.xml-editor {
+  width: 100%;
+  min-height: 480px;
+  padding: 16px 18px;
+  border: 1px solid #D4D4D8;
+  border-radius: 10px;
+  background: #FBFBFC;
+  color: #27272A;
+  font-family: "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+  resize: vertical;
+}
+.xml-editor:focus {
+  outline: none;
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(212, 46, 18, 0.12);
+}
+
 /* Collapsible reference panels under the upload forms. */
 .spec-details {
   margin-top: var(--s4);

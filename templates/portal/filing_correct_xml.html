@@ -1,0 +1,59 @@
+{% extends "portal/base.html" %}
+{% block title %}Amend {{ original.reference }} · NRS AEOI-CRS Portal{% endblock %}
+{% block content %}
+<h1>Amend {{ original.reference }} in XML</h1>
+<p class="page-sub">
+  {{ original.name|default:original.get_kind_display }} &middot;
+  <span class="mono">{{ original.uploaded_filename }}</span> &middot;
+  {{ original.account_reports.count }} account report{{ original.account_reports.count|pluralize }} &middot;
+  Reporting year {{ original.reporting_year }}
+</p>
+
+<div class="panel band" style="margin-bottom: 16px;">
+  <strong>How to amend this document</strong>
+  <ul class="vf-todo" style="margin: 8px 0 0;">
+    <li>Every filed record is pre-loaded as a correction (<span class="mono">OECD2</span>) with a new <span class="mono">DocRefId</span> and a <span class="mono">CorrDocRefId</span> pointing at the filed version — leave both as they are.</li>
+    <li>Edit the values that change. <strong>Remove</strong> the whole <span class="mono">&lt;crs:AccountReport&gt;</span> block of any record that needs no amendment.</li>
+    <li>To delete a filed record, change its <span class="mono">OECD2</span> to <span class="mono">OECD3</span> and leave its data as reported.</li>
+    <li>New accounts do not belong here — file them in a separate CRS701 return.</li>
+  </ul>
+</div>
+
+{% if errors %}
+<div class="error-text">
+  <strong>The amendment was rejected with {{ errors|length }} error{{ errors|length|pluralize }}.</strong>
+  Nothing has been filed. Correct each item below and submit again.
+</div>
+<div class="table-wrap" style="margin-bottom: var(--s3);">
+<table class="data">
+  <thead>
+    <tr>
+      <th style="width:90px">XML line</th>
+      <th style="width:44%">What caused the error</th>
+      <th>How to resolve it</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in error_rows %}
+    <tr>
+      <td class="mono">{% if row.line %}{{ row.line }}{% else %}&mdash;{% endif %}</td>
+      <td>{{ row.cause }}</td>
+      <td>{{ row.hint }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<form method="post" action="/portal/filings/{{ original.pk }}/correct/xml/" class="stacked">
+  {% csrf_token %}
+  <textarea name="xml" class="xml-editor" spellcheck="false" autocomplete="off"
+            aria-label="CRS702 amendment document">{{ xml_text }}</textarea>
+  <div class="actions-row">
+    <button type="submit" class="btn"
+            onclick="return confirm('Submit this amendment to the NRS? It will be validated the moment it arrives.');">Submit amendment</button>
+    <a class="btn secondary" href="/portal/filings/{{ original.pk }}/">Cancel</a>
+  </div>
+</form>
+{% endblock %}

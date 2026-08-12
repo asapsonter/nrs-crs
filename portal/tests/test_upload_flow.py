@@ -44,7 +44,7 @@ class TestCleanUploadIsSent:
         _upload(portal_client, _sample())
         filing = Filing.objects.latest("pk")
         # Submitted and auto-validated in the same request.
-        assert filing.status == Filing.Status.UNDER_VALIDATION
+        assert filing.status == Filing.Status.ACCEPTED  # auto-accepted on passing validation
         assert filing.submitted_at is not None
         assert filing.validated_at is not None
 
@@ -55,7 +55,7 @@ class TestCleanUploadIsSent:
         filing = Filing.objects.latest("pk")
         assert filing.findings.filter(severity=ValidationFinding.Severity.WARNING).exists()
         assert not filing.findings.filter(severity=ValidationFinding.Severity.ERROR).exists()
-        assert filing.status == Filing.Status.UNDER_VALIDATION
+        assert filing.status == Filing.Status.ACCEPTED  # auto-accepted on passing validation
 
     def test_report_states_it_was_sent(self, rfi, partners, portal_client):
         _upload(portal_client, _sample())
@@ -120,6 +120,36 @@ class TestUploadWithErrorsIsHeld:
         assert "How to resolve it" in html
         assert "activated CRS partner list" in html  # the R-104 resolution
 
+    def test_every_error_row_carries_a_line_number(self, rfi, partners, portal_client):
+        """File-level errors anchor to the element they concern (or its
+        parent block when the element is missing), so no row shows a dash."""
+        import re as _re
+
+        text = _sample().decode()
+        # Remove MessageRefId entirely and blank the first DocRefId: the two
+        # errors from the user-reported case.
+        broken = _re.sub(r"[ \t]*<crs:MessageRefId>[^<]*</crs:MessageRefId>\r?\n", "", text)
+        broken = _re.sub(
+            r"<stf:DocRefId>[^<]*</stf:DocRefId>", "<stf:DocRefId></stf:DocRefId>", broken, count=2
+        )
+        from portal.xml_ingest import parse_crs_upload
+
+        from core import config as _config
+
+        result = parse_crs_upload(broken.encode(), _config.CURRENT_REPORTING_YEAR)
+        assert not result.ok
+        assert any("MessageRefId" in e for e in result.errors)
+        # Every error is line-anchored — the MessageRefId one points at the
+        # MessageSpec block it is missing from.
+        for error in result.errors:
+            assert error.startswith("Line "), error
+        # And the DocRefId rejection carries its own resolution, not the
+        # generic fallback.
+        from portal.xml_ingest import resolution_hint
+
+        docref_error = next(e for e in result.errors if "DocSpec/DocRefId" in e)
+        assert "globally unique DocRefId" in resolution_hint(docref_error)
+
     def test_rejected_upload_lists_line_cause_and_resolution(self, rfi, partners, portal_client):
         """A schema-level rejection names the XML line, cause, and fix."""
         broken = _sample().decode().replace(
@@ -152,7 +182,7 @@ class TestAmendedSampleSequence:
         assert not amendment.findings.filter(
             code__in=["R-501", "R-502", "R-503"]
         ).exists()
-        assert amendment.status == Filing.Status.UNDER_VALIDATION
+        assert amendment.status == Filing.Status.ACCEPTED  # auto-accepted on passing validation
 
     def test_amendment_without_original_is_held(self, rfi, partners, portal_client):
         _upload(portal_client, _sample(self.AMENDED), name=self.AMENDED)

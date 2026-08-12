@@ -110,22 +110,31 @@ def build_packages(year: int) -> list:
         packages__isnull=True,
     ).select_related("filing__rfi")
 
-    by_country: dict[str, list[AccountReport]] = {}
+    # New data (OECD1) and corrections/deletions (OECD2/OECD3) travel in
+    # separate messages: a CRS701 may only carry new data, a CRS702 only
+    # corrections. FI-initiated correction filings land in the second group.
+    by_country: dict[tuple[str, str], list[AccountReport]] = {}
     for record in eligible:
-        by_country.setdefault(record.residence_country, []).append(record)
+        message_type = "CRS701" if record.doc_type_indic == AccountReport.DocTypeIndic.OECD1 else "CRS702"
+        by_country.setdefault((record.residence_country, message_type), []).append(record)
 
     packages = []
-    for code, records in sorted(by_country.items()):
+    for (code, message_type), records in sorted(by_country.items()):
         package = ExchangePackage.objects.create(
             jurisdiction=partners[code],
             reporting_year=year,
             message_ref_id=next_message_ref_id(code, year),
-            message_type="CRS701",
+            message_type=message_type,
         )
         package.records.set(records)
         package.xml_content = generate_crs_xml(package)
         package.save(update_fields=["xml_content"])
         packages.append(package)
+        # A packaged correction supersedes the filed version it references,
+        # so the platform's live view reflects the amended data.
+        if message_type == "CRS702":
+            corrected_ids = [r.corr_doc_ref_id for r in records if r.corr_doc_ref_id]
+            AccountReport.objects.filter(doc_ref_id__in=corrected_ids).update(superseded=True)
 
     # Any accepted filing with every live (non-superseded) record now
     # packaged is in exchange.
@@ -566,5 +575,64 @@ def filing_to_xml(filing) -> str:
         jurisdiction=SimpleNamespace(code=(filing.receiving_country or "").strip() or "NG"),
         message_ref_id=filing.message_reference or filing.reference,
         reporting_year=filing.reporting_year,
+    )
+    return generate_crs_xml(shim)
+
+
+def correction_xml_draft(original) -> str:
+    """A pre-filled CRS702 amendment document for an XML-filed return.
+
+    Every live record of the original filing is emitted as an OECD2
+    correction template: a freshly minted DocRefId, CorrDocRefId pointing at
+    the filed record, and all reported values ready to edit in place. The
+    preparer amends values, removes the AccountReport blocks that need no
+    change, or flips OECD2 to OECD3 to delete a record. Nothing is persisted
+    here — the edited document comes back through the normal upload pipeline.
+    """
+    import uuid
+    from types import SimpleNamespace
+
+    records = list(
+        original.account_reports.filter(superseded=False)
+        .select_related("filing__rfi")
+        .order_by("doc_ref_id")
+    )
+    prefix = f"NG{original.reporting_year}-{original.rfi.reference}-"
+    sequence = AccountReport.objects.filter(doc_ref_id__startswith=prefix).count()
+    for record in records:
+        # In-memory only: these instances are never saved.
+        record.corr_doc_ref_id = record.doc_ref_id
+        while True:
+            sequence += 1
+            candidate = f"{prefix}{sequence:06d}"
+            if not AccountReport.objects.filter(doc_ref_id=candidate).exists():
+                break
+        record.doc_ref_id = candidate
+        record.doc_type_indic = AccountReport.DocTypeIndic.OECD2
+
+    class _Records(list):
+        """Just enough queryset surface for generate_crs_xml."""
+
+        def exists(self):
+            return bool(self)
+
+        def select_related(self, *args, **kwargs):
+            return self
+
+        def prefetch_related(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+    shim = SimpleNamespace(
+        message_type="CRS702",
+        records=_Records(records),
+        jurisdiction=SimpleNamespace(code=(original.receiving_country or "").strip() or "NG"),
+        message_ref_id=(
+            f"NG{original.reporting_year}{(original.receiving_country or 'NG')}"
+            f"-CORR-{uuid.uuid4().hex[:10].upper()}"
+        ),
+        reporting_year=original.reporting_year,
     )
     return generate_crs_xml(shim)

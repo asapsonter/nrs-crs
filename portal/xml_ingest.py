@@ -194,19 +194,63 @@ def _record_lines(text: str, tag: str) -> list[int]:
 
 _RECORD_ERROR = re.compile(r"^AccountReport (\d+):")
 
+#: Where a file-level error points in the document: the element the message
+#: names, or — when that element is the thing that is missing — the block
+#: that should contain it. Ordered so the most specific phrase wins.
+_FILE_LEVEL_ANCHORS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("MessageRefId", ("crs:MessageRefId", "crs:MessageSpec")),
+    ("ReportingPeriod", ("crs:ReportingPeriod", "crs:MessageSpec")),
+    ("MessageTypeIndic", ("crs:MessageTypeIndic", "crs:MessageSpec")),
+    ("TransmittingCountry", ("crs:TransmittingCountry", "crs:MessageSpec")),
+    ("ReceivingCountry", ("crs:ReceivingCountry", "crs:MessageSpec")),
+    ("ReportingFI", ("crs:ReportingFI", "crs:CrsBody", "CRSFiling")),
+    ("AccountReport elements", ("crs:ReportingGroup", "crs:CrsBody", "CRSFiling")),
+    ("year attribute", ("CRSFiling",)),
+)
 
-def _attach_lines(result: ParseResult, lines: list[int]) -> None:
-    """Stamp each record with its XML line and prefix errors with it."""
+
+def _line_of_first(text: str, tags: tuple[str, ...]) -> int | None:
+    """Line of the first occurrence of any of the given opening tags.
+
+    Each tag is tried with its namespace prefix and then bare, so the same
+    anchors serve the official CRS_OECD document and the simplified form.
+    """
+    for tag in tags:
+        for needle in (f"<{tag}", f"<{tag.split(':')[-1]}"):
+            idx = text.find(needle)
+            if idx != -1:
+                return text.count("\n", 0, idx) + 1
+    return None
+
+
+def _attach_lines(result: ParseResult, text: str, lines: list[int]) -> None:
+    """Stamp each record with its XML line and prefix every error with one.
+
+    Record errors point at their AccountReport element; file-level errors
+    point at the element they concern, falling back to its parent block when
+    the element itself is absent; a bad root element points at line 1.
+    """
     for index, record in enumerate(result.records):
         if index < len(lines):
             record.source_line = lines[index]
 
     def with_line(message: str) -> str:
+        if message.startswith("Line "):
+            return message
         match = _RECORD_ERROR.match(message)
         if match:
             index = int(match.group(1)) - 1
             if 0 <= index < len(lines):
                 return f"Line {lines[index]} — {message}"
+            return message
+        if "Root element" in message:
+            return f"Line 1 — {message}"
+        for phrase, tags in _FILE_LEVEL_ANCHORS:
+            if phrase in message:
+                line = _line_of_first(text, tags)
+                if line is not None:
+                    return f"Line {line} — {message}"
+                break
         return message
 
     result.errors = [with_line(message) for message in result.errors]
@@ -230,11 +274,11 @@ def parse_crs_upload(content: bytes, expected_year: int) -> ParseResult:
     if root.tag == f"{{{CRS_NS}}}CRS_OECD":
         result = _parse_oecd_document(root, expected_year)
         result.warnings = _schema_findings(text) + result.warnings
-        _attach_lines(result, _record_lines(text, "<crs:AccountReport"))
+        _attach_lines(result, text, _record_lines(text, "<crs:AccountReport"))
         return result
     if root.tag == "CRSFiling":
         result = _parse_simplified_document(root, expected_year)
-        _attach_lines(result, _record_lines(text, "<AccountReport"))
+        _attach_lines(result, text, _record_lines(text, "<AccountReport"))
         return result
     return ParseResult(
         ok=False,
@@ -678,6 +722,8 @@ _RESOLUTION_HINTS: tuple[tuple[str, str], ...] = (
     ("not well formed", "Open the file in an XML editor and repair the syntax at the line and column shown, then export it again."),
     ("not valid UTF-8", "Save the file with UTF-8 encoding (without a byte-order mark) and upload it again."),
     ("Root element must be", "Export the filing as a CRS_OECD v2.0 document (urn:oecd:ties:crs:v2) or use the NRS simplified CRSFiling form."),
+    ("DocSpec/DocRefId", "Give the record's DocSpec a globally unique DocRefId (for example NG2026-<your reference>); it identifies this version of the record for all time."),
+    ("DocSpec is required", "Add a DocSpec block to the record carrying a DocTypeIndic and a globally unique DocRefId."),
     ("has already been filed", "Issue a new, unused DocRefId for the record. If you are correcting a filed record, set CorrDocRefId to the DocRefId being corrected."),
     ("used more than once", "Give every record its own unique DocRefId; no value may repeat within or across filings."),
     ("CorrDocRefId must not be present", "Remove CorrDocRefId from new-data (OECD1) records; it belongs only on corrections and deletions."),

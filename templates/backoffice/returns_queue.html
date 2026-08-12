@@ -6,6 +6,7 @@
 <p class="page-sub">Filings are validated automatically against the CRS schema standard on submission; four-eyes approval of the validated filings happens here.</p>
 
 <h2>Awaiting approval</h2>
+<p class="muted">Administrative notices awaiting an officer's decision. CRS data filings do not queue here — they are accepted automatically when validation passes.</p>
 <table class="data">
   <thead><tr><th>Reference</th><th>Institution</th><th>Type</th><th>Findings</th><th>Submitted</th><th>Validated by</th><th></th></tr></thead>
   <tbody>
@@ -48,19 +49,26 @@
 </table>
 
 <h2>Accepted</h2>
+<p class="muted">CRS filings that pass validation are accepted automatically at submission; open one to review its records or download it as CRS XML.</p>
 <table class="data">
-  <thead><tr><th>Reference</th><th>Institution</th><th>Status</th><th>Approved by</th><th>Accepted</th></tr></thead>
+  <thead><tr><th>Reference</th><th>Institution</th><th>Status</th><th>Approved by</th><th>Accepted</th><th></th></tr></thead>
   <tbody>
     {% for filing in accepted %}
     <tr>
       <td class="mono"><a href="/backoffice/returns/{{ filing.pk }}/">{{ filing.reference }}</a></td>
       <td>{{ filing.rfi.legal_name }}</td>
       <td>{% pill filing.status filing.get_status_display %}</td>
-      <td>{{ filing.approved_by.name|default:"NRS Returns Unit" }}</td>
+      <td>{{ filing.approved_by.name|default:"Automatic validation" }}</td>
       <td>{{ filing.accepted_at|date:"Y-m-d" }}</td>
+      <td>
+        <a href="/backoffice/returns/{{ filing.pk }}/">Open</a>
+        {% if filing.is_crs_data %}
+        &middot; <a href="/backoffice/returns/{{ filing.pk }}/download/">Download XML</a>
+        {% endif %}
+      </td>
     </tr>
     {% empty %}
-    <tr><td colspan="5" class="muted">No accepted filings.</td></tr>
+    <tr><td colspan="6" class="muted">No accepted filings.</td></tr>
     {% endfor %}
   </tbody>
 </table>

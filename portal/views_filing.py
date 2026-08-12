@@ -460,53 +460,96 @@ def filing_upload(request):
             errors = ["Choose a CRS XML file."]
         else:
             result = parse_crs_upload(upload.read(), config.CURRENT_REPORTING_YEAR)
-            # A DocRefId must be unique in space and time, so a document whose
-            # record identifiers are already on file is a resubmission rather
-            # than new data. Checked before anything is written so a rejected
-            # upload leaves no partial filing behind.
-            if result.ok:
-                incoming = [record.doc_ref_id for record in result.records if record.doc_ref_id]
-                already_filed = set(
-                    AccountReport.objects.filter(doc_ref_id__in=incoming).values_list("doc_ref_id", flat=True)
-                )
-                if already_filed:
-                    result.ok = False
-                    result.errors = [
-                        f"DocRefId '{doc_ref}' has already been filed. A corrected record must carry a "
-                        "new DocRefId with CorrDocRefId pointing at the record it replaces."
-                        for doc_ref in sorted(already_filed)[:10]
-                    ]
+            _reject_already_filed(result)
             if not result.ok:
                 errors = result.errors
             else:
                 meta = request.session.pop("pending_filing_meta", None) or {}
-                filing = Filing.objects.create(
-                    reference=next_filing_reference(),
+                filing = _store_upload(
+                    profile,
+                    result,
+                    upload.name,
                     name=meta.get("name", ""),
-                    rfi=profile.rfi,
-                    reporting_year=config.CURRENT_REPORTING_YEAR,
-                    period_end_date=parse_date(meta.get("period_end_date", "") or "") if meta.get("period_end_date") else None,
-                    kind=Filing.Kind.XML_UPLOAD,
-                    created_by=profile,
-                    uploaded_filename=upload.name,
+                    period_end_date=parse_date(meta.get("period_end_date", "") or "")
+                    if meta.get("period_end_date")
+                    else None,
                 )
-                # A CRS_OECD document carries its message header; keep it on
-                # the filing so the preparer need not re-enter it.
-                header_fields = []
-                if result.message_type_indic in Filing.MessageType.values:
-                    filing.message_type = result.message_type_indic
-                    header_fields.append("message_type")
-                if result.receiving_country:
-                    filing.receiving_country = result.receiving_country
-                    header_fields.append("receiving_country")
-                if result.message_ref_id:
-                    filing.message_reference = result.message_ref_id
-                    header_fields.append("message_reference")
-                if header_fields:
-                    filing.save(update_fields=header_fields)
-                for parsed in result.records:
-                    record = AccountReport.objects.create(
-                        filing=filing,
+                _validate_and_send_upload(profile, filing)
+                return redirect(f"/portal/filings/{filing.pk}/validation/")
+    return render(
+        request,
+        "portal/filing_upload.html",
+        {
+            "errors": errors,
+            "error_rows": _upload_error_rows(errors),
+            "nav": "filings",
+            **_deadline_context(),
+        },
+    )
+
+
+def _reject_already_filed(result) -> None:
+    """Fail a parse result whose DocRefIds are already on file.
+
+    A DocRefId must be unique in space and time, so a document whose record
+    identifiers are already on file is a resubmission rather than new data.
+    Checked before anything is written so a rejected upload leaves no
+    partial filing behind.
+    """
+    if not result.ok:
+        return
+    incoming = [record.doc_ref_id for record in result.records if record.doc_ref_id]
+    already_filed = set(
+        AccountReport.objects.filter(doc_ref_id__in=incoming).values_list("doc_ref_id", flat=True)
+    )
+    if already_filed:
+        result.ok = False
+        result.errors = [
+            f"DocRefId '{doc_ref}' has already been filed. A corrected record must carry a "
+            "new DocRefId with CorrDocRefId pointing at the record it replaces."
+            for doc_ref in sorted(already_filed)[:10]
+        ]
+
+
+def _store_upload(
+    profile: PortalUser,
+    result,
+    filename: str,
+    *,
+    name: str = "",
+    period_end_date=None,
+    reporting_year: int | None = None,
+    corrects: Filing | None = None,
+) -> Filing:
+    """Create the filing and its records from a parsed CRS document."""
+    filing = Filing.objects.create(
+        reference=next_filing_reference(),
+        name=name,
+        rfi=profile.rfi,
+        reporting_year=reporting_year or config.CURRENT_REPORTING_YEAR,
+        period_end_date=period_end_date,
+        kind=Filing.Kind.XML_UPLOAD,
+        created_by=profile,
+        uploaded_filename=filename,
+        corrects=corrects,
+    )
+    # A CRS_OECD document carries its message header; keep it on
+    # the filing so the preparer need not re-enter it.
+    header_fields = []
+    if result.message_type_indic in Filing.MessageType.values:
+        filing.message_type = result.message_type_indic
+        header_fields.append("message_type")
+    if result.receiving_country:
+        filing.receiving_country = result.receiving_country
+        header_fields.append("receiving_country")
+    if result.message_ref_id:
+        filing.message_reference = result.message_ref_id
+        header_fields.append("message_reference")
+    if header_fields:
+        filing.save(update_fields=header_fields)
+    for parsed in result.records:
+        record = AccountReport.objects.create(
+            filing=filing,
                         # Keep the FI's own DocRefId so the correction chain it
                         # started stays resolvable; the simplified CRSFiling
                         # form carries none, so one is minted for it.
@@ -547,43 +590,30 @@ def filing_upload(request):
                         interest=parsed.interest,
                         gross_proceeds=parsed.gross_proceeds,
                         other_income=parsed.other_income,
-                    )
-                    for cp in parsed.controlling_persons:
-                        ControllingPerson.objects.create(
-                            account_report=record,
-                            name=cp.name,
-                            first_name=cp.first_name,
-                            middle_name=cp.middle_name,
-                            last_name=cp.last_name,
-                            residence_country=cp.residence_country,
-                            tin=cp.tin,
-                            address=cp.address,
-                            city=cp.city,
-                            birth_date=cp.birth_date,
-                            ctrlg_person_type=cp.ctrlg_person_type,
-                        )
-                detail = f"CRS XML file {upload.name} accepted with {len(result.records)} records."
-                if result.contains_test_data:
-                    detail += " Document carried OECD10-OECD13 test-data indicators."
-                if result.warnings:
-                    detail += f" {len(result.warnings)} schema/consistency warning(s)."
-                _audit(profile, "FILING_UPLOADED", filing, detail, after=filing.status)
-
-                # Schema deviations and test-data indicators are recorded on
-                # the audit trail and surface to the Supervision Centre with
-                # the filing; the preparer sees a clean filed confirmation.
-                _validate_and_send_upload(profile, filing)
-                return redirect(f"/portal/filings/{filing.pk}/validation/")
-    return render(
-        request,
-        "portal/filing_upload.html",
-        {
-            "errors": errors,
-            "error_rows": _upload_error_rows(errors),
-            "nav": "filings",
-            **_deadline_context(),
-        },
-    )
+        )
+        for cp in parsed.controlling_persons:
+            ControllingPerson.objects.create(
+                account_report=record,
+                name=cp.name,
+                first_name=cp.first_name,
+                middle_name=cp.middle_name,
+                last_name=cp.last_name,
+                residence_country=cp.residence_country,
+                tin=cp.tin,
+                address=cp.address,
+                city=cp.city,
+                birth_date=cp.birth_date,
+                ctrlg_person_type=cp.ctrlg_person_type,
+            )
+    detail = f"CRS XML file {filename} accepted with {len(result.records)} records."
+    if corrects is not None:
+        detail = f"CRS702 correction of {corrects.reference}: {detail}"
+    if result.contains_test_data:
+        detail += " Document carried OECD10-OECD13 test-data indicators."
+    if result.warnings:
+        detail += f" {len(result.warnings)} schema/consistency warning(s)."
+    _audit(profile, "FILING_UPLOADED", filing, detail, after=filing.status)
+    return filing
 
 
 def _validate_and_send_upload(profile: PortalUser, filing: Filing) -> bool:
@@ -865,12 +895,30 @@ def filing_detail(request, filing_id: int):
         Filing.Kind.EXCEL_UPLOAD,
     )
     can_correct = filing.status == Filing.Status.RETURNED
+    # An accepted CRS data filing may be amended through a CRS702 correction
+    # filing; a correction draft offers the original's records to pull in.
+    can_open_correction = (
+        filing.status in (Filing.Status.ACCEPTED, Filing.Status.IN_EXCHANGE)
+        and filing.is_crs_data
+        and filing.kind != Filing.Kind.NIL
+    )
+    correction_source = []
+    if filing.corrects_id and filing.status in _OPEN_STATUSES:
+        picked = set(
+            filing.account_reports.exclude(corr_doc_ref_id="").values_list("corr_doc_ref_id", flat=True)
+        )
+        correction_source = [
+            {"record": record, "picked": record.doc_ref_id in picked}
+            for record in filing.corrects.account_reports.filter(superseded=False)
+        ]
     return render(
         request,
         "portal/filing_detail.html",
         {
             "filing": filing,
             "records": records,
+            "can_open_correction": can_open_correction,
+            "correction_source": correction_source,
             "jurisdictions": _jurisdiction_choices(),
             **_record_form_context(),
             "flagged_ids": flagged_ids,
@@ -894,6 +942,13 @@ def record_add(request, filing_id: int):
     """Add an account report block to an open manual filing."""
     profile = request.portal_profile
     filing = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
+    if filing.message_type == Filing.MessageType.CRS702:
+        messages.error(
+            request,
+            "A corrections filing cannot carry new data. Pull records in from the "
+            "original filing; report new accounts in a separate CRS701 filing.",
+        )
+        return redirect(f"/portal/filings/{filing.pk}/")
     if filing.status not in _OPEN_STATUSES:
         messages.error(request, "Records can only be added while the filing is open.")
         return redirect(f"/portal/filings/{filing.pk}/")
@@ -1175,8 +1230,204 @@ def filing_stage(request, filing_id: int):
     if filing.is_notice:
         messages.success(request, f"{filing.reference} submitted to the NRS.")
         return redirect(f"/portal/filings/{filing.pk}/view/")
-    # CRS data filings land on the filed-successfully screen.
+    # Errors hold the filing back as a draft carrying its findings — the same
+    # gate the upload flow applies — so nothing with known errors reaches the
+    # Supervision Centre.
+    if filing.findings.filter(severity=ValidationFinding.Severity.ERROR).exists():
+        filing.status = Filing.Status.DRAFT
+        filing.submitted_at = None
+        filing.save(update_fields=["status", "submitted_at"])
+        _audit(
+            profile,
+            "FILING_VALIDATION_FAILED",
+            filing,
+            "Validation found errors at submission; filing held as a draft for correction.",
+            before=Filing.Status.SUBMITTED,
+            after=filing.status,
+        )
+    # The validation report shows either the filed confirmation or the
+    # held-back report with each error's cause and resolution.
     return redirect(f"/portal/filings/{filing.pk}/validation/")
+
+
+def _copy_record_fields(record: AccountReport) -> dict:
+    """Every payload field of a record, excluding identity and lineage."""
+    return {
+        f.name: getattr(record, f.name)
+        for f in AccountReport._meta.fields
+        if f.name
+        not in ("id", "filing", "doc_ref_id", "corr_doc_ref_id", "doc_type_indic", "superseded", "source_line")
+    }
+
+
+@portal_required
+def filing_correct(request, filing_id: int):
+    """Open a CRS702 correction filing for a return already with the NRS.
+
+    Mirrors the Vizor workflow: an accepted filing is never edited in place —
+    the institution creates a corrections filing that references the filed
+    records by DocRefId. The draft starts empty; records are pulled in from
+    the original as amendments (OECD2) or deletions (OECD3).
+    """
+    profile = request.portal_profile
+    original = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
+    if request.method != "POST":
+        return redirect(f"/portal/filings/{original.pk}/")
+    if original.status not in (Filing.Status.ACCEPTED, Filing.Status.IN_EXCHANGE):
+        messages.error(request, "Only a filing accepted by the NRS can be corrected.")
+        return redirect(f"/portal/filings/{original.pk}/")
+    if not original.is_crs_data or original.kind == Filing.Kind.NIL:
+        messages.error(request, "This filing carries no account records to correct.")
+        return redirect(f"/portal/filings/{original.pk}/")
+    existing = Filing.objects.filter(corrects=original, status__in=_OPEN_STATUSES).first()
+    if existing:
+        messages.info(request, f"Correction {existing.reference} is already open for this filing.")
+        return redirect(f"/portal/filings/{existing.pk}/")
+
+    reference = next_filing_reference()
+    filing = Filing.objects.create(
+        reference=reference,
+        name=f"Correction of {original.reference}",
+        rfi=profile.rfi,
+        reporting_year=original.reporting_year,
+        period_end_date=original.period_end_date,
+        kind=Filing.Kind.MANUAL,
+        message_type=Filing.MessageType.CRS702,
+        status=Filing.Status.DRAFT,
+        receiving_country=original.receiving_country,
+        sending_company_in=original.sending_company_in or profile.rfi.tin,
+        # A corrections message needs its own MessageRefId; minted from the
+        # new filing reference, which is unique by construction.
+        message_reference=f"NG{original.reporting_year}{original.receiving_country or 'NG'}-{reference}",
+        created_by=profile,
+        corrects=original,
+    )
+    _audit(
+        profile,
+        "CORRECTION_OPENED",
+        filing,
+        f"CRS702 correction opened against {original.reference}.",
+        after=filing.status,
+    )
+    messages.success(
+        request,
+        f"Correction filing {filing.reference} opened. Pull in the records to amend or delete, "
+        "then submit.",
+    )
+    return redirect(f"/portal/filings/{filing.pk}/")
+
+
+@portal_required
+def filing_correct_xml(request, filing_id: int):
+    """Amend an XML-filed return in its native format.
+
+    An uploaded document may carry many account reports, so the amendment is
+    edited as XML rather than record by record: the editor opens pre-filled
+    with a CRS702 document holding every filed record as an OECD2 template
+    (new DocRefId, CorrDocRefId pointing at the filed version). The preparer
+    amends values, removes the AccountReport blocks that need no change, or
+    flips OECD2 to OECD3 to delete a record, then submits through the same
+    validation pipeline as an upload. Manual filings keep the form-based
+    correction flow.
+    """
+    from exchange.services import correction_xml_draft
+
+    profile = request.portal_profile
+    original = get_object_or_404(Filing, pk=filing_id, rfi=profile.rfi)
+    if original.kind != Filing.Kind.XML_UPLOAD:
+        return redirect(f"/portal/filings/{original.pk}/")
+    if original.status not in (Filing.Status.ACCEPTED, Filing.Status.IN_EXCHANGE):
+        messages.error(request, "Only a filing accepted by the NRS can be corrected.")
+        return redirect(f"/portal/filings/{original.pk}/")
+
+    errors: list[str] = []
+    xml_text = ""
+    if request.method == "POST":
+        xml_text = request.POST.get("xml", "")
+        result = parse_crs_upload(xml_text.encode("utf-8"), original.reporting_year)
+        if result.ok and result.message_type_indic != Filing.MessageType.CRS702:
+            result.ok = False
+            result.errors = [
+                "MessageTypeIndic must remain CRS702: an amendment carries corrections "
+                "for previously sent information."
+            ]
+        _reject_already_filed(result)
+        if not result.ok:
+            errors = result.errors
+        else:
+            filing = _store_upload(
+                profile,
+                result,
+                f"correction-{original.reference}.xml",
+                name=f"Correction of {original.reference}",
+                reporting_year=original.reporting_year,
+                corrects=original,
+            )
+            _validate_and_send_upload(profile, filing)
+            return redirect(f"/portal/filings/{filing.pk}/validation/")
+    if not xml_text:
+        xml_text = correction_xml_draft(original)
+    return render(
+        request,
+        "portal/filing_correct_xml.html",
+        {
+            "original": original,
+            "xml_text": xml_text,
+            "errors": errors,
+            "error_rows": _upload_error_rows(errors),
+            "nav": "filings",
+            **_deadline_context(),
+        },
+    )
+
+
+@portal_required
+def correction_pick_record(request, filing_id: int, record_id: int):
+    """Pull one record of the original filing into the correction draft.
+
+    An amendment copies the record as OECD2 with CorrDocRefId pointing at the
+    filed DocRefId, then opens it for editing; a deletion copies it as OECD3,
+    which instructs partner jurisdictions to remove the record.
+    """
+    profile = request.portal_profile
+    filing = get_object_or_404(
+        Filing, pk=filing_id, rfi=profile.rfi, corrects__isnull=False, status__in=_OPEN_STATUSES
+    )
+    original = get_object_or_404(
+        AccountReport, pk=record_id, filing=filing.corrects, superseded=False
+    )
+    if request.method != "POST":
+        return redirect(f"/portal/filings/{filing.pk}/")
+    if filing.account_reports.filter(corr_doc_ref_id=original.doc_ref_id).exists():
+        messages.error(request, "That record is already part of this correction.")
+        return redirect(f"/portal/filings/{filing.pk}/")
+    action = request.POST.get("action", "amend")
+    replacement = AccountReport.objects.create(
+        filing=filing,
+        doc_ref_id=next_doc_ref_id(profile.rfi, filing.reporting_year),
+        corr_doc_ref_id=original.doc_ref_id,
+        doc_type_indic=(
+            AccountReport.DocTypeIndic.OECD3 if action == "delete" else AccountReport.DocTypeIndic.OECD2
+        ),
+        **_copy_record_fields(original),
+    )
+    for cp in original.controlling_persons.all():
+        cp.pk = None
+        cp.account_report = replacement
+        cp.save()
+    if action == "delete":
+        _audit(
+            profile, "CORRECTION_DELETION", filing,
+            f"Deletion of {original.doc_ref_id} staged as {replacement.doc_ref_id} (OECD3).",
+        )
+        messages.success(request, f"Deletion of record {original.doc_ref_id} added to the correction.")
+        return redirect(f"/portal/filings/{filing.pk}/")
+    _audit(
+        profile, "CORRECTION_AMENDMENT", filing,
+        f"Amendment of {original.doc_ref_id} staged as {replacement.doc_ref_id} (OECD2).",
+    )
+    messages.success(request, "Record pulled into the correction. Amend the fields that change, then save.")
+    return redirect(f"/portal/filings/{filing.pk}/records/{replacement.pk}/")
 
 
 # Retired: the maker-checker review step no longer exists. Both the Primary

@@ -355,7 +355,7 @@ class TestReturnedFilingEditing:
         assert response.status_code == 302
         filing.refresh_from_db()
         # Resubmission auto-validates against the CRS schema on arrival.
-        assert filing.status == Filing.Status.UNDER_VALIDATION
+        assert filing.status == Filing.Status.ACCEPTED  # auto-accepted on passing validation
         assert filing.validated_at is not None
 
     def test_resubmit_blocked_while_flagged_record_uncorrected(self, rfi, partners, portal_client):
@@ -388,7 +388,7 @@ class TestReturnedFilingEditing:
         assert response.status_code == 302
         filing.refresh_from_db()
         # Resubmission auto-validates against the CRS schema on arrival.
-        assert filing.status == Filing.Status.UNDER_VALIDATION
+        assert filing.status == Filing.Status.ACCEPTED  # auto-accepted on passing validation
         assert filing.validated_at is not None
 
 

@@ -35,9 +35,12 @@ def next_filing_reference() -> str:
 def auto_validate_submission(filing: Filing) -> tuple[int, int]:
     """Validate a filing against the CRS schema standard at submission.
 
-    Validation is automatic: the moment an institution submits, the schema
-    checks run and the filing moves straight to Under Validation with its
-    findings recorded, so the Supervision Centre queue begins at approval.
+    Validation is automatic, and so is acceptance: a CRS data filing with no
+    error findings is Accepted the moment it is submitted — the callers hold
+    anything with errors back as a draft, so nothing sits in a Supervision
+    Centre approval queue. Accepted filings stay open for viewing and
+    download there. Administrative notices are the exception: they apply
+    changes to the institution itself, so an officer still approves them.
     Returns (file_level_count, record_level_count).
     """
     # Imported here: backoffice.validation pulls in exchange models, which
@@ -48,9 +51,23 @@ def auto_validate_submission(filing: Filing) -> tuple[int, int]:
     from core.models import AuditLog
 
     file_count, record_count = run_validation(filing)
-    filing.status = Filing.Status.UNDER_VALIDATION
+    has_errors = filing.findings.filter(severity="ERROR").exists()
     filing.validated_at = timezone.now()
-    filing.save(update_fields=["status", "validated_at"])
+    if filing.is_notice or has_errors:
+        filing.status = Filing.Status.UNDER_VALIDATION
+        filing.save(update_fields=["status", "validated_at"])
+        detail = (
+            f"Automatic schema validation on submission: {file_count} file-level, "
+            f"{record_count} record-level findings."
+        )
+    else:
+        filing.status = Filing.Status.ACCEPTED
+        filing.accepted_at = timezone.now()
+        filing.save(update_fields=["status", "validated_at", "accepted_at"])
+        detail = (
+            "Automatic schema validation passed on submission; filing accepted "
+            "for exchange."
+        )
     AuditLog.record(
         actor_name="CRS schema validator",
         actor_role="System",
@@ -59,10 +76,7 @@ def auto_validate_submission(filing: Filing) -> tuple[int, int]:
         target=filing.reference,
         before_state=Filing.Status.SUBMITTED,
         after_state=filing.status,
-        detail=(
-            f"Automatic schema validation on submission: {file_count} file-level, "
-            f"{record_count} record-level findings."
-        ),
+        detail=detail,
     )
     return file_count, record_count
 

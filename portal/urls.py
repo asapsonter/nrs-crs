@@ -30,6 +30,9 @@ urlpatterns = [
     path("filings/<int:filing_id>/records/<int:record_id>/cp/add/", views_filing.controlling_person_add),
     path("filings/<int:filing_id>/records/<int:record_id>/cp/<int:cp_id>/delete/", views_filing.controlling_person_delete),
     path("filings/<int:filing_id>/stage/", views_filing.filing_stage),
+    path("filings/<int:filing_id>/correct/", views_filing.filing_correct),
+    path("filings/<int:filing_id>/correct/xml/", views_filing.filing_correct_xml),
+    path("filings/<int:filing_id>/correction/records/<int:record_id>/pick/", views_filing.correction_pick_record),
     # Retired with the maker-checker review step:
     # path("filings/<int:filing_id>/check/", views_filing.filing_check),
     path("filings/<int:filing_id>/resubmit/", views_filing.filing_resubmit),
