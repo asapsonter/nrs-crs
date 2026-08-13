@@ -37,7 +37,7 @@ def filing():
     )
     filing = Filing.objects.create(
         reference=f"FIL-{YEAR}-70001", rfi=rfi, reporting_year=YEAR,
-        kind=Filing.Kind.MANUAL, status=Filing.Status.UNDER_VALIDATION,
+        kind=Filing.Kind.MANUAL, status=Filing.Status.ACCEPTED,
         receiving_country="GB", sending_company_in="0450088801",
         message_reference=f"NG{YEAR}GB-DL-1",
     )

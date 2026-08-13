@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<crs:CRS_OECD xmlns:crs="urn:oecd:ties:crs:v2" xmlns:cfc="urn:oecd:ties:commontypesfatcacrs:v2" xmlns:stf="urn:oecd:ties:crsstf:v5" xmlns:iso="urn:oecd:ties:isocrstypes:v1" version="2.0">
+  <crs:MessageSpec>
+    <crs:TransmittingCountry>NG</crs:TransmittingCountry>
+    <crs:ReceivingCountry>FR</crs:ReceivingCountry>
+    <crs:MessageType>CRS</crs:MessageType>
+    <crs:MessageRefId>NG2025FRDEMO5143AC0EA</crs:MessageRefId>
+    <crs:MessageTypeIndic>CRS702</crs:MessageTypeIndic>
+    <crs:ReportingPeriod>2025-12-31</crs:ReportingPeriod>
+    <crs:Timestamp>2026-03-31T09:00:00</crs:Timestamp>
+  </crs:MessageSpec>
+  <crs:CrsBody>
+    <crs:ReportingFI>
+      <crs:ResCountryCode>NG</crs:ResCountryCode>
+      <crs:IN issuedBy="NG">0450088801</crs:IN>
+      <crs:Name>Zenith Trust Bank Plc</crs:Name>
+      <crs:Address>
+        <cfc:CountryCode>NG</cfc:CountryCode>
+        <cfc:AddressFix>
+          <cfc:Street>12 Broad Street</cfc:Street>
+          <cfc:PostCode>100001</cfc:PostCode>
+          <cfc:City>Lagos</cfc:City>
+          <cfc:CountrySubentity>Lagos</cfc:CountrySubentity>
+        </cfc:AddressFix>
+      </crs:Address>
+      <crs:DocSpec>
+        <stf:DocTypeIndic>OECD0</stf:DocTypeIndic>
+        <stf:DocRefId>NG2025-DEMO5143AC0E-FR-FI</stf:DocRefId>
+      </crs:DocSpec>
+    </crs:ReportingFI>
+    <crs:ReportingGroup>
+      <crs:AccountReport>
+        <crs:DocSpec>
+          <stf:DocTypeIndic>OECD2</stf:DocTypeIndic>
+          <stf:DocRefId>NG2025-DEMO5143AC0E-FR-11</stf:DocRefId>
+          <stf:CorrDocRefId>NG2025-DEMO5143AC0E-FR-1</stf:CorrDocRefId>
+        </crs:DocSpec>
+        <crs:AccountNumber AcctNumberType="OECD601">FR29DEMO5143AC0E0001</crs:AccountNumber>
+        <crs:AccountHolder>
+          <crs:Individual>
+            <crs:ResCountryCode>FR</crs:ResCountryCode>
+            <crs:TIN issuedBy="FR">1900227123456</crs:TIN>
+            <crs:Name>
+              <crs:FirstName>Chinelo</crs:FirstName>
+              <crs:LastName>Eze</crs:LastName>
+            </crs:Name>
+            <crs:Address>
+              <cfc:CountryCode>FR</cfc:CountryCode>
+              <cfc:AddressFix>
+                <cfc:Street>18 Rue de Rivoli</cfc:Street>
+                <cfc:PostCode>75004</cfc:PostCode>
+                <cfc:City>Paris</cfc:City>
+              </cfc:AddressFix>
+            </crs:Address>
+            <crs:BirthInfo>
+              <crs:BirthDate>1990-02-27</crs:BirthDate>
+              <crs:City>Paris</crs:City>
+              <crs:CountryInfo><crs:CountryCode>FR</crs:CountryCode></crs:CountryInfo>
+            </crs:BirthInfo>
+          </crs:Individual>
+        </crs:AccountHolder>
+        <crs:AccountBalance currCode="EUR">9126400.75</crs:AccountBalance>
+        <crs:Payment>
+          <crs:Type>CRS502</crs:Type>
+          <crs:PaymentAmnt currCode="EUR">148750.00</crs:PaymentAmnt>
+        </crs:Payment>
+      </crs:AccountReport>
+      <crs:AccountReport>
+        <crs:DocSpec>
+          <stf:DocTypeIndic>OECD3</stf:DocTypeIndic>
+          <stf:DocRefId>NG2025-DEMO5143AC0E-FR-13</stf:DocRefId>
+          <stf:CorrDocRefId>NG2025-DEMO5143AC0E-FR-3</stf:CorrDocRefId>
+        </crs:DocSpec>
+        <crs:AccountNumber AcctNumberType="OECD605">DEMO-5143AC0E-0003</crs:AccountNumber>
+        <crs:AccountHolder>
+          <crs:Organisation>
+            <crs:ResCountryCode>FR</crs:ResCountryCode>
+            <crs:IN issuedBy="FR">775665019</crs:IN>
+            <crs:Name>Fontaine Trust Associés</crs:Name>
+            <crs:Address>
+              <cfc:CountryCode>FR</cfc:CountryCode>
+              <cfc:AddressFix>
+                <cfc:Street>31 Rue la Boétie</cfc:Street>
+                <cfc:PostCode>75008</cfc:PostCode>
+                <cfc:City>Paris</cfc:City>
+              </cfc:AddressFix>
+            </crs:Address>
+          </crs:Organisation>
+          <crs:AcctHolderType>CRS101</crs:AcctHolderType>
+        </crs:AccountHolder>
+        <crs:ControllingPerson>
+          <crs:Individual>
+            <crs:ResCountryCode>FR</crs:ResCountryCode>
+            <crs:TIN issuedBy="FR">1680719654321</crs:TIN>
+            <crs:Name>
+              <crs:FirstName>Ibrahim</crs:FirstName>
+              <crs:LastName>Danjuma</crs:LastName>
+            </crs:Name>
+            <crs:Address>
+              <cfc:CountryCode>FR</cfc:CountryCode>
+              <cfc:AddressFix>
+                <cfc:Street>5 Demo Close</cfc:Street>
+                <cfc:PostCode>DM1 1AA</cfc:PostCode>
+                <cfc:City>Demo Town</cfc:City>
+              </cfc:AddressFix>
+            </crs:Address>
+            <crs:BirthInfo>
+              <crs:BirthDate>1968-07-19</crs:BirthDate>
+              <crs:City>Lyon</crs:City>
+              <crs:CountryInfo><crs:CountryCode>FR</crs:CountryCode></crs:CountryInfo>
+            </crs:BirthInfo>
+          </crs:Individual>
+          <crs:CtrlgPersonType>CRS801</crs:CtrlgPersonType>
+        </crs:ControllingPerson>
+        <crs:AccountBalance currCode="EUR">23800000.00</crs:AccountBalance>
+        <crs:Payment>
+          <crs:Type>CRS503</crs:Type>
+          <crs:PaymentAmnt currCode="EUR">540000.00</crs:PaymentAmnt>
+        </crs:Payment>
+      </crs:AccountReport>
+    </crs:ReportingGroup>
+  </crs:CrsBody>
+</crs:CRS_OECD>

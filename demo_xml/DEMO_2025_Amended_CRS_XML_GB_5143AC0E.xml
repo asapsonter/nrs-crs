@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<crs:CRS_OECD xmlns:crs="urn:oecd:ties:crs:v2" xmlns:cfc="urn:oecd:ties:commontypesfatcacrs:v2" xmlns:stf="urn:oecd:ties:crsstf:v5" xmlns:iso="urn:oecd:ties:isocrstypes:v1" version="2.0">
+  <crs:MessageSpec>
+    <crs:TransmittingCountry>NG</crs:TransmittingCountry>
+    <crs:ReceivingCountry>GB</crs:ReceivingCountry>
+    <crs:MessageType>CRS</crs:MessageType>
+    <crs:MessageRefId>NG2025GBDEMO5143AC0EA</crs:MessageRefId>
+    <crs:MessageTypeIndic>CRS702</crs:MessageTypeIndic>
+    <crs:ReportingPeriod>2025-12-31</crs:ReportingPeriod>
+    <crs:Timestamp>2026-03-31T09:00:00</crs:Timestamp>
+  </crs:MessageSpec>
+  <crs:CrsBody>
+    <crs:ReportingFI>
+      <crs:ResCountryCode>NG</crs:ResCountryCode>
+      <crs:IN issuedBy="NG">0450088801</crs:IN>
+      <crs:Name>Zenith Trust Bank Plc</crs:Name>
+      <crs:Address>
+        <cfc:CountryCode>NG</cfc:CountryCode>
+        <cfc:AddressFix>
+          <cfc:Street>12 Broad Street</cfc:Street>
+          <cfc:PostCode>100001</cfc:PostCode>
+          <cfc:City>Lagos</cfc:City>
+          <cfc:CountrySubentity>Lagos</cfc:CountrySubentity>
+        </cfc:AddressFix>
+      </crs:Address>
+      <crs:DocSpec>
+        <stf:DocTypeIndic>OECD0</stf:DocTypeIndic>
+        <stf:DocRefId>NG2025-DEMO5143AC0E-GB-FI</stf:DocRefId>
+      </crs:DocSpec>
+    </crs:ReportingFI>
+    <crs:ReportingGroup>
+      <crs:AccountReport>
+        <crs:DocSpec>
+          <stf:DocTypeIndic>OECD2</stf:DocTypeIndic>
+          <stf:DocRefId>NG2025-DEMO5143AC0E-GB-11</stf:DocRefId>
+          <stf:CorrDocRefId>NG2025-DEMO5143AC0E-GB-1</stf:CorrDocRefId>
+        </crs:DocSpec>
+        <crs:AccountNumber AcctNumberType="OECD601">GB29DEMO5143AC0E0001</crs:AccountNumber>
+        <crs:AccountHolder>
+          <crs:Individual>
+            <crs:ResCountryCode>GB</crs:ResCountryCode>
+            <crs:TIN issuedBy="GB">QQ123456C</crs:TIN>
+            <crs:Name>
+              <crs:FirstName>Adaeze</crs:FirstName>
+              <crs:LastName>Okonkwo</crs:LastName>
+            </crs:Name>
+            <crs:Address>
+              <cfc:CountryCode>GB</cfc:CountryCode>
+              <cfc:AddressFix>
+                <cfc:Street>14 Cheapside</cfc:Street>
+                <cfc:PostCode>EC2V 6AA</cfc:PostCode>
+                <cfc:City>London</cfc:City>
+              </cfc:AddressFix>
+            </crs:Address>
+            <crs:BirthInfo>
+              <crs:BirthDate>1984-05-12</crs:BirthDate>
+              <crs:City>London</crs:City>
+              <crs:CountryInfo><crs:CountryCode>GB</crs:CountryCode></crs:CountryInfo>
+            </crs:BirthInfo>
+          </crs:Individual>
+        </crs:AccountHolder>
+        <crs:AccountBalance currCode="GBP">9126400.75</crs:AccountBalance>
+        <crs:Payment>
+          <crs:Type>CRS502</crs:Type>
+          <crs:PaymentAmnt currCode="GBP">148750.00</crs:PaymentAmnt>
+        </crs:Payment>
+      </crs:AccountReport>
+      <crs:AccountReport>
+        <crs:DocSpec>
+          <stf:DocTypeIndic>OECD3</stf:DocTypeIndic>
+          <stf:DocRefId>NG2025-DEMO5143AC0E-GB-13</stf:DocRefId>
+          <stf:CorrDocRefId>NG2025-DEMO5143AC0E-GB-3</stf:CorrDocRefId>
+        </crs:DocSpec>
+        <crs:AccountNumber AcctNumberType="OECD605">DEMO-5143AC0E-0003</crs:AccountNumber>
+        <crs:AccountHolder>
+          <crs:Organisation>
+            <crs:ResCountryCode>GB</crs:ResCountryCode>
+            <crs:IN issuedBy="GB">5561092837</crs:IN>
+            <crs:Name>Harcourt Estate Partners LLP</crs:Name>
+            <crs:Address>
+              <cfc:CountryCode>GB</cfc:CountryCode>
+              <cfc:AddressFix>
+                <cfc:Street>22 Bishopsgate</cfc:Street>
+                <cfc:PostCode>EC2N 4AJ</cfc:PostCode>
+                <cfc:City>London</cfc:City>
+              </cfc:AddressFix>
+            </crs:Address>
+          </crs:Organisation>
+          <crs:AcctHolderType>CRS101</crs:AcctHolderType>
+        </crs:AccountHolder>
+        <crs:ControllingPerson>
+          <crs:Individual>
+            <crs:ResCountryCode>GB</crs:ResCountryCode>
+            <crs:TIN issuedBy="GB">AB446677D</crs:TIN>
+            <crs:Name>
+              <crs:FirstName>Oluwaseun</crs:FirstName>
+              <crs:LastName>Adebayo</crs:LastName>
+            </crs:Name>
+            <crs:Address>
+              <cfc:CountryCode>GB</cfc:CountryCode>
+              <cfc:AddressFix>
+                <cfc:Street>5 Demo Close</cfc:Street>
+                <cfc:PostCode>DM1 1AA</cfc:PostCode>
+                <cfc:City>Demo Town</cfc:City>
+              </cfc:AddressFix>
+            </crs:Address>
+            <crs:BirthInfo>
+              <crs:BirthDate>1975-11-03</crs:BirthDate>
+              <crs:City>Manchester</crs:City>
+              <crs:CountryInfo><crs:CountryCode>GB</crs:CountryCode></crs:CountryInfo>
+            </crs:BirthInfo>
+          </crs:Individual>
+          <crs:CtrlgPersonType>CRS801</crs:CtrlgPersonType>
+        </crs:ControllingPerson>
+        <crs:AccountBalance currCode="GBP">23800000.00</crs:AccountBalance>
+        <crs:Payment>
+          <crs:Type>CRS503</crs:Type>
+          <crs:PaymentAmnt currCode="GBP">540000.00</crs:PaymentAmnt>
+        </crs:Payment>
+      </crs:AccountReport>
+    </crs:ReportingGroup>
+  </crs:CrsBody>
+</crs:CRS_OECD>

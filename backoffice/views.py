@@ -130,9 +130,18 @@ def dashboard(request):
         # Filings validate automatically against the CRS schema on submission,
         # so the queue starts at approval: no "awaiting validation" figure.
         {
-            "label": "Filings awaiting approval",
+            "label": "Notices awaiting decision",
             "value": Filing.objects.filter(
-                status=Filing.Status.UNDER_VALIDATION, validated_at__isnull=False
+                status=Filing.Status.UNDER_VALIDATION,
+                kind__in=Filing.NOTICE_KINDS,
+            ).count(),
+            "url": "/backoffice/returns/",
+            "cap": access.VIEW_RETURNS,
+        },
+        {
+            "label": "Filings accepted this cycle",
+            "value": Filing.objects.filter(
+                status__in=[Filing.Status.ACCEPTED, Filing.Status.IN_EXCHANGE]
             ).count(),
             "url": "/backoffice/returns/",
             "cap": access.VIEW_RETURNS,

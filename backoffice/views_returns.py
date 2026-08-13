@@ -22,10 +22,12 @@ from portal.models import Filing, ValidationFinding
 @require_cap(access.VIEW_RETURNS)
 def queue(request):
     """Filings by processing stage, including the nil return register."""
-    # SUBMITTED is included as a safety net: filings predating automatic
-    # validation surface here instead of vanishing from every queue.
+    # CRS data filings never queue for approval — validation accepts or holds
+    # them at submission. Only administrative notices await an officer's
+    # decision, because approving one applies a change to the institution.
     awaiting_approval = Filing.objects.filter(
-        status__in=[Filing.Status.SUBMITTED, Filing.Status.UNDER_VALIDATION]
+        status__in=[Filing.Status.SUBMITTED, Filing.Status.UNDER_VALIDATION],
+        kind__in=Filing.NOTICE_KINDS,
     ).select_related("rfi")
     returned = Filing.objects.filter(status=Filing.Status.RETURNED).select_related("rfi")
     accepted = Filing.objects.filter(
